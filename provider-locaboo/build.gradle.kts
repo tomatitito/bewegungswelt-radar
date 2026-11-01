@@ -14,4 +14,8 @@ java {
 
 dependencies {
     implementation(project(":core:availability"))
+    implementation(libs.okhttp)
+    implementation(libs.gson)
+    implementation(libs.coroutines.core)
+    testImplementation(libs.junit)
 }

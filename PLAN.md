@@ -4,11 +4,12 @@
 
 Build read-only Android app with Jetpack Compose that displays Bewegungswelt Waldau availability in calendar form.
 
-- `Buchbar` for bookable 30-minute slots
+- `Buchbar` for eligible booking starts on a 30-minute display grid
 - `Gebucht` for occupied slots
 - closed or unknown periods shown separately, never reported as bookable
 - no person-related data parsed, logged, persisted, or displayed
 - architecture supports adding availability sources without changing core calendar code
+- opt-in notifications when monitored future slots become newly bookable
 
 Product direction, self-extension instructions, module boundaries, and contract
 evolution rules live in [AGENTS.md](AGENTS.md). This file tracks delivery of the
@@ -52,6 +53,8 @@ for each date
 Rules:
 
 - slot size: 30 minutes
+- a bookable start must fit the full minimum booking duration; private-person
+  offers currently start at 60 minutes, not 30
 - timezone: `Europe/Berlin`
 - interval semantics: start inclusive, end exclusive
 - DST transitions covered by tests
@@ -86,6 +89,42 @@ On narrow screens, show the selected day's timetable with a week strip instead
 of shrinking seven timetable columns beyond readability. Tapping a month date
 opens week mode with that date selected. Slot details remain read-only.
 
+## Newly available slot notifications
+
+This is a required read-only feature, to follow reliable live availability.
+Notify when a monitored future interval becomes bookable because a booking was
+cancelled, a closure was lifted, or a new date was released for booking.
+
+- Reuse `AvailabilitySource` and the calendar's availability calculation; do not
+  infer availability from occupancy alone or duplicate Locaboo rules in a worker.
+- Establish the first successful check as a baseline without alerting for all
+  existing free slots. A newly enabled or changed monitoring range also needs a
+  baseline for previously unobserved intervals.
+- Compare fresh, complete observations with the last confirmed state for the same
+  source and interval. Alert for confirmed unavailable-to-bookable transitions,
+  including dates previously blocked by the verified booking horizon. Unknown,
+  failed, or incomplete observations are not evidence of a transition and must
+  not overwrite the last confirmed state. Recovery alone must not cause alerts.
+- Persist only the minimal source/interval/status, freshness, and deduplication
+  state needed across process restarts, never raw responses or personal data.
+- Avoid repeat alerts for unchanged availability across refreshes, retries, and
+  app restarts. Group adjacent newly available slots to avoid notification floods.
+- Use Android WorkManager for network-constrained, best-effort periodic checks,
+  with bounded requests and failure backoff. No exact-time or instant-delivery
+  promise: Android may defer checks, and short-lived openings may be missed.
+- Keep scheduling, monitoring preferences, persistence, notification channels,
+  and notification-permission handling in `app/`. Core comparison rules stay
+  Android-independent; the provider only supplies data.
+- Monitoring is opt-in and can be disabled. Explain permission denial or blocked
+  notifications without breaking the calendar. Tapping an alert opens the
+  relevant date and refreshes it; an alert never reserves or guarantees a slot.
+
+Before implementation, settle the monitored date horizon, weekday/time filters,
+minimum useful free duration, and desired checking cadence within Android and
+upstream limits. These preferences are not yet specified. Start with on-device
+checks; a continuously running backend or upstream push integration would be a
+separate decision if faster delivery is required.
+
 ## Delivery phases
 
 ### Phase 1 — project foundation
@@ -99,6 +138,10 @@ opens week mode with that date selected. Slot details remain read-only.
 
 ### Phase 2 — availability domain
 
+**Implemented:** `calculateAvailability`, interval normalization, minimum-duration
+and start-grid rules, unavailable windows, unknown coverage, and deterministic
+boundary/closure/lead-time/DST tests. No provider-specific rules live in core.
+
 - implement interval normalization and 30-minute slot generation
 - add opening, booking, closure, unknown, lead-time, and DST tests
 - keep algorithm Android-independent for JVM unit tests
@@ -106,6 +149,17 @@ opens week mode with that date selected. Slot details remain read-only.
 **Exit:** sanitized fixtures produce deterministic statuses.
 
 ### Phase 3 — Locaboo read-only adapter
+
+**Adapter implemented and live-read validated:** anonymous configuration/calendar
+requests, selective streaming decoding, custom hours, closures, lead time and
+booking horizon, bounded HTTP retry/timeouts, and sanitized failures. Synthetic
+HTTP contract tests run offline. Published offers inform the 60-minute minimum;
+server-side booking acceptance and a populated live earliest-start response are
+not verified. See [provider notes](provider-locaboo/README.md).
+
+**Remaining:** connect the adapter and engine to a `CalendarViewModel`, add Android
+network permission, and replace production fixture wiring with loading, refresh,
+and failure handling. The Android UI still shows synthetic slots.
 
 - implement cookie-preserving HTTP client
 - reproduce opening-hours and bookings requests
@@ -131,7 +185,19 @@ opens week mode with that date selected. Slot details remain read-only.
 
 **Exit:** upstream failures cannot produce false `Buchbar` slots.
 
-### Phase 6 — prove second source
+### Phase 6 — newly available slot notifications
+
+- define monitoring preferences and comparison semantics described above
+- persist a minimal baseline and deduplication state
+- add opt-in WorkManager checks and Android notification/permission handling
+- open the relevant calendar date from an alert and refresh availability
+- test first-run baselines, unchanged results, cancellations, newly released
+  dates, failures/recovery, range changes, restart deduplication, and opt-out
+
+**Exit:** newly bookable monitored intervals produce useful, non-duplicated
+notifications; failed checks never produce false availability alerts.
+
+### Phase 7 — prove second source
 
 - implement one small fake or second bundled source
 - migrate without modifying calendar UI or slot engine
@@ -139,7 +205,7 @@ opens week mode with that date selected. Slot details remain read-only.
 
 **Exit:** extension boundary is proven by migration, not speculation.
 
-### Phase 7 — trusted external providers
+### Phase 8 — trusted external providers
 
 Implement the later-phase external provider model documented in
 [AGENTS.md](AGENTS.md#trusted-external-providers--later-phase), after bundled
@@ -158,15 +224,17 @@ sources have proven the contracts.
 - Locaboo code depends on core contract; core does not depend on Locaboo
 - fixture tests cover interval boundaries, closures, lead time, and DST
 - UI remains functional with provider error and shows concise diagnostic
+- opt-in monitoring notifies about newly bookable slots without duplicate alerts
+- failed/unknown checks and first-run baselines do not generate new-slot alerts
+- monitoring can be disabled; notification denial leaves the calendar usable
 - app passes unit tests, Android lint, and build
 
 ## Explicit non-goals for MVP
 
 - booking or payment
 - authentication
-- notifications
 - multiple selectable venues
 - arbitrary runtime Compose UI plugins
 - silent APK installation
-- background polling
+- guaranteed real-time alerts or a continuously running monitoring backend
 - long-term booking history

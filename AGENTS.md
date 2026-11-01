@@ -5,7 +5,20 @@
 This is a **native Android app built with Kotlin and Jetpack Compose**, not a web
 app. The first use case is visualizing Bewegungswelt Waldau calendar and
 availability data through Locaboo. Start read-only. The current foundation shows
-synthetic fixtures; live integration is still planned in [PLAN.md](PLAN.md).
+synthetic fixtures; a live adapter and availability engine are implemented but
+not connected to the UI yet. See [PLAN.md](PLAN.md) for remaining integration.
+
+Newly available slot notifications are a required use case, not a speculative
+extension. After reliable live availability is in place, support opt-in Android
+notifications when a monitored future interval becomes bookable, including a
+cancellation or a newly released booking date. Reuse the same source contract and
+availability rules as the calendar. Android scheduling, notification permissions,
+and minimal persisted comparison/deduplication state belong in `app/`, not the
+provider. Background checks are best-effort, not guaranteed real-time alerts.
+Establish a baseline without an initial notification flood; failed, incomplete,
+or unknown observations must not reset it or produce false new-slot alerts.
+Persist no personal booking data or raw responses. See [PLAN.md](PLAN.md) for the
+notification milestone and remaining product decisions.
 
 Keep these possible next use cases in mind without implementing them prematurely:
 
@@ -69,8 +82,14 @@ The existing read-only contract is `AvailabilitySource`, with a `descriptor` and
 truth is `core/availability/src/main/kotlin/de/bewegungswelt/radar/availability/AvailabilitySource.kt`;
 the models are in `core/model/src/main/kotlin/de/bewegungswelt/radar/model/Calendar.kt`.
 `CalendarSnapshot` contains the range, opening windows, bookings, closures, and
-fetch timestamp. `UNKNOWN` must prevent missing or failed upstream data from
-appearing bookable.
+fetch timestamp, plus optional booking rules and non-occupancy unavailable windows.
+`calculateAvailability` in `core/availability` generates half-hour display slots;
+`BOOKABLE` denotes a start where the full minimum booking duration fits, not
+permission to book a standalone 30-minute interval. Missing rules leave otherwise
+free starts `UNKNOWN`. Source load failures use sanitized
+`AvailabilityLoadException`; never replace a failed load with an empty successful
+snapshot. `UNKNOWN` must prevent missing or failed upstream data from appearing
+bookable.
 
 ## Evolving beyond availability
 

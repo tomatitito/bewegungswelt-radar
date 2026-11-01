@@ -1,5 +1,6 @@
 package de.bewegungswelt.radar.model
 
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -26,12 +27,28 @@ enum class SlotStatus { BOOKABLE, BOOKED, CLOSED, UNKNOWN }
 
 data class Slot(val window: TimeWindow, val status: SlotStatus)
 
+/** Minimum elapsed booking length and allowed local wall-clock start interval from midnight. */
+data class BookingRules(val minimumDuration: Duration, val startInterval: Duration) {
+    init {
+        require(!minimumDuration.isZero && !minimumDuration.isNegative) {
+            "Minimum booking duration must be positive"
+        }
+        require(!startInterval.isZero && !startInterval.isNegative) {
+            "Booking start interval must be positive"
+        }
+    }
+}
+
 data class CalendarSnapshot(
     val range: CalendarRange,
     val openingWindows: List<TimeWindow>,
     val bookings: List<TimeWindow>,
     val closures: List<TimeWindow>,
     val fetchedAt: Instant,
+    /** Absent rules leave otherwise free starts UNKNOWN. */
+    val bookingRules: BookingRules? = null,
+    /** Non-occupancy restrictions, such as lead time and booking horizon. */
+    val unavailableWindows: List<TimeWindow> = emptyList(),
 )
 
 data class SourceDescriptor(val id: String, val name: String)

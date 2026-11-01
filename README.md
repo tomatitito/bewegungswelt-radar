@@ -2,7 +2,9 @@
 
 Read-only Android calendar for Bewegungswelt Waldau. This foundation displays a
 **synthetic example calendar**, not live availability. See [PLAN.md](PLAN.md) for
-the remaining availability engine, Locaboo integration, and production UI work.
+the remaining app integration, notifications, and production UI work. The live
+Locaboo adapter and availability engine are implemented and tested independently;
+the Android screen is not connected to them yet.
 
 The dark calendar opens on the current week in `Europe/Berlin`. Switch to
 **Monat** to browse dates; tapping a date opens its week with that day selected.
@@ -43,9 +45,11 @@ connected Android device with `adb install -r app/build/outputs/apk/debug/app-de
 
 - `app`: Android composition root and fixture-backed Compose screen.
 - `core:model`: Android-independent calendar intervals, slots, statuses, diagnostics.
-- `core:availability`: `AvailabilitySource` contract; depends only on the model.
-- `provider-locaboo`: reserved JVM module for the future adapter; depends on core,
-  never the other way around. No live requests are implemented yet.
+- `core:availability`: `AvailabilitySource` contract and deterministic half-hour
+  booking-start calculation, including minimum duration, restrictions, and DST.
+- `provider-locaboo`: anonymous read-only HTTP adapter; depends on core, never the
+  other way around. See its [integration notes](provider-locaboo/README.md) for
+  observed endpoints, privacy behavior, and limits of booking-rule verification.
 
 All intervals are start-inclusive and end-exclusive. The venue time zone is
 `Europe/Berlin`. No personal booking data is modeled or logged.
