@@ -66,16 +66,19 @@ orbs. Running setup requires network access and passwordless sudo when system
 packages are missing. SDK license acceptance is automatic in this development
 environment.
 
-Setup persists repository-scoped `JAVA_HOME`, `ANDROID_HOME`, and tool paths in
-`~/.config/amp/bewegungswelt-radar.env`, loaded by `~/.bash_profile`, so fresh
-non-interactive login shells receive them. Updating setup refreshes this env file
-without duplicating the login hook. It checks existing installations before
-downloading tools. Gradle handles incremental dependency resolution and build
-caching; there is no separate cache marker. Worker count and compiler/Gradle
-heaps are bounded so builds fit small orbs.
+Setup persists `JAVA_HOME`, `ANDROID_HOME`, and tool paths in
+`~/.config/amp/bewegungswelt-radar.env`, loaded by `~/.bash_profile` and
+`~/.bashrc` throughout the project orb. The hook does not depend on the initial
+working directory: Amp starts its login shell before changing to the repository, and its
+non-login child shells inherit that environment. Updating setup refreshes this
+env file without duplicating the login hook. It checks existing installations
+before downloading tools. Gradle handles incremental dependency resolution and
+build caching; there is no separate cache marker. Worker count and
+compiler/Gradle heaps are bounded so builds fit small orbs.
 
-`.agents/resume` checks toolchain readiness; it never installs dependencies or
-starts services. Temurin bundles its certificate store inside the JDK rather
+`.agents/resume` explicitly loads the saved environment before checking toolchain
+readiness, even when invoked without a login shell; it never installs dependencies
+or starts services. Temurin bundles its certificate store inside the JDK rather
 than using Debian's `/etc/ssl/certs/java` link, so regenerating the orb's system
 certificate directory does not remove the JDK trust store.
 No emulator or Android system image is installed in orbs. Native UI interaction

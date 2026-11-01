@@ -78,22 +78,24 @@ export ANDROID_SDK_ROOT="\$ANDROID_HOME"
 export PATH="\$JAVA_HOME/bin:\$ANDROID_HOME/cmdline-tools/23.0/bin:\$ANDROID_HOME/platform-tools:\$PATH"
 EOF
 
-# Migrate the original inline exports; future pins update only the env file.
-if grep -Fqx '# Bewegungswelt Radar orb environment' "$HOME/.bash_profile" 2>/dev/null; then
-    sed -i '/^# Bewegungswelt Radar orb environment$/,/^esac$/d' "$HOME/.bash_profile"
-fi
-marker="# Bewegungswelt Radar orb environment v2"
-if ! grep -Fqx "$marker" "$HOME/.bash_profile" 2>/dev/null; then
-    cat >> "$HOME/.bash_profile" <<EOF
+# Replace directory-scoped hooks: Amp starts its login shell before cd'ing to the repo.
+for marker in '# Bewegungswelt Radar orb environment' '# Bewegungswelt Radar orb environment v2'; do
+    if grep -Fqx "$marker" "$HOME/.bash_profile" 2>/dev/null; then
+        sed -i "/^$marker\$/,/^esac\$/d" "$HOME/.bash_profile"
+    fi
+done
+marker="# Bewegungswelt Radar orb environment v3"
+for startup_file in "$HOME/.bash_profile" "$HOME/.bashrc"; do
+    if ! grep -Fqx "$marker" "$startup_file" 2>/dev/null; then
+        cat >> "$startup_file" <<EOF
 
 $marker
-case "\$PWD/" in
-    "$repo_root/"*)
-        source "$env_file"
-        ;;
-esac
-EOF
+if [[ -r "$env_file" ]]; then
+    source "$env_file"
 fi
+EOF
+    fi
+done
 
 echo "[setup +${SECONDS}s] Building, testing, linting, and warming Gradle caches"
 ./gradlew --no-daemon --console=plain test lintDebug assembleDebug

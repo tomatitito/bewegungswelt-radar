@@ -4,6 +4,14 @@ set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
+# Resume can run without a login shell; restore the installed toolchain explicitly.
+env_file="$HOME/.config/amp/bewegungswelt-radar.env"
+if [[ ! -r "$env_file" ]]; then
+    echo "[resume] Android environment is missing. Run .agents/setup from the repository root." >&2
+    exit 1
+fi
+source "$env_file"
+
 # No services or authentication are needed for the offline fixture app.
 # Check persisted configuration without installing anything during wake-up.
 if [[ ! -x "${JAVA_HOME:-}/bin/javac" ||
