@@ -10,100 +10,9 @@ Build read-only Android app with Jetpack Compose that displays Bewegungswelt Wal
 - no person-related data parsed, logged, persisted, or displayed
 - architecture supports adding availability sources without changing core calendar code
 
-## Self-extension model
-
-Follow principles from Quincy's `qui-dnab` self-extension plan, adapted to Android:
-
-- small recovery-oriented core remains usable when extension fails
-- narrow, versioned extension contract
-- explicit lifecycle: `discover -> validate -> start -> activate -> stop`
-- extension-owned resources are disposable
-- failed activation preserves previous working source
-- diagnostics are visible
-- capabilities are added only when a real extension needs them
-- provider code never accesses private UI or core internals
-
-Android should not download and execute arbitrary Kotlin/Dex inside main app. This conflicts with Android security and store policies. Use two extension levels:
-
-1. **Bundled source modules** — compiled with app; first implementation is Locaboo/Bewegungswelt.
-2. **Trusted provider APKs** — later, separate Android packages discovered and called through versioned Binder/AIDL contract. Installation remains explicit and user-confirmed.
-
-First bundled source proves contract before external plugin loading is built.
-
-## Boundaries
-
-```text
-Compose UI
-  CalendarViewModel
-    AvailabilitySource
-      LocabooAvailabilitySource
-        LocabooClient
-```
-
-Core owns:
-
-- calendar domain model
-- slot calculation and status rules
-- timezone handling
-- source lifecycle and diagnostics
-- Compose calendar rendering
-- source selection when more than one source exists
-
-Source extension owns:
-
-- remote-system session and request details
-- provider IDs such as Locaboo manager, widget, and location IDs
-- remote DTOs
-- translation into core contracts
-
-Core must not know Locaboo URLs, cookies, IDs, or response shapes.
-
-## Initial project shape
-
-```text
-app/                       # Android composition root and Compose UI
-core/
-  model/                   # CalendarRange, Slot, SlotStatus, diagnostics
-  availability/            # source contract and slot calculation
-provider-locaboo/          # session, HTTP DTOs, Bewegungswelt adapter
-```
-
-Keep one application deployable. Split further only when runtime plugin work creates demonstrated pressure.
-
-## Core contract
-
-```kotlin
-interface AvailabilitySource {
-    val descriptor: SourceDescriptor
-
-    suspend fun loadCalendar(range: CalendarRange): CalendarSnapshot
-}
-```
-
-```kotlin
-data class CalendarSnapshot(
-    val range: CalendarRange,
-    val openingWindows: List<TimeWindow>,
-    val bookings: List<TimeWindow>,
-    val closures: List<TimeWindow>,
-    val fetchedAt: Instant,
-)
-```
-
-Provider-specific location IDs remain private to provider. Domain model contains no `locationId` while app supports only Bewegungswelt.
-
-Slot statuses:
-
-```kotlin
-enum class SlotStatus {
-    BOOKABLE,
-    BOOKED,
-    CLOSED,
-    UNKNOWN,
-}
-```
-
-`UNKNOWN` prevents upstream failures from appearing as availability.
+Product direction, self-extension instructions, module boundaries, and contract
+evolution rules live in [AGENTS.md](AGENTS.md). This file tracks delivery of the
+initial read-only Bewegungswelt use case and subsequent milestones.
 
 ## Locaboo integration
 
@@ -173,40 +82,6 @@ Initial behavior:
 
 On narrow screens, show day pager with week strip instead of shrinking seven columns beyond readability.
 
-## External provider APKs — later phase
-
-Build only after bundled Locaboo source proves contract.
-
-```text
-provider APK
-  manifest metadata
-  exported discovery service guarded by permission
-  versioned AIDL implementation
-
-host app
-  discover candidates by intent
-  verify package/signature/trust
-  validate API version and capabilities
-  bind and health-check candidate
-  atomically activate candidate
-```
-
-External source contract returns core-neutral calendar data, not Compose components or provider DTOs. Core renders all UI.
-
-Agent extension loop:
-
-```text
-agent scaffolds provider from template
-  implement remote adapter
-  add sanitized contract tests
-  build provider APK
-  run compatibility checks
-  user installs/trusts APK
-  app discovers and activates provider
-```
-
-No silent installation or unrestricted filesystem/network capability API.
-
 ## Delivery phases
 
 ### Phase 1 — project foundation
@@ -262,9 +137,9 @@ No silent installation or unrestricted filesystem/network capability API.
 
 ### Phase 7 — trusted external providers
 
-- define versioned AIDL contract and plugin manifest metadata
-- implement discovery, trust, lifecycle, diagnostics, disposal, and atomic activation
-- add provider template and compatibility test command
+Implement the later-phase external provider model documented in
+[AGENTS.md](AGENTS.md#trusted-external-providers--later-phase), after bundled
+sources have proven the contracts.
 
 **Exit:** separately installed trusted provider APK can supply calendar data without core changes.
 
