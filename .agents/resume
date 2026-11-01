@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+
+# No services or authentication are needed for the offline fixture app.
+# Check persisted configuration without installing anything during wake-up.
+if [[ ! -x "${JAVA_HOME:-}/bin/javac" ||
+      ! -f "${ANDROID_HOME:-}/platforms/android-37.2/android.jar" ||
+      ! -r "${JAVA_HOME:-}/lib/security/cacerts" ]]; then
+    echo "[resume] Android toolchain is missing. Run .agents/setup from the repository root." >&2
+    exit 1
+fi
+
+echo "[resume] JDK and Android SDK ready; no backing services required"

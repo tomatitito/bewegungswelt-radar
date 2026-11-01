@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$repo_root"
+started=$SECONDS
+
+echo "[setup] Checking JDK 25 and Android command-line prerequisites"
+packages=()
+for package in curl unzip ca-certificates tar gzip; do
+    if ! dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -qx 'install ok installed'; then
+        packages+=("$package")
+    fi
+done
+if ((${#packages[@]})); then
+    sudo apt-get update -qq
+    sudo apt-get install -y --no-install-recommends "${packages[@]}"
+fi
+
+export JAVA_HOME="$HOME/.local/share/jdks/temurin-25.0.5+8"
+export ANDROID_HOME="${ANDROID_HOME:-$HOME/android-sdk}"
+export ANDROID_SDK_ROOT="$ANDROID_HOME"
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/23.0/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+if [[ ! -x "$JAVA_HOME/bin/javac" ]]; then
+    echo "[setup +${SECONDS}s] Installing checksum-pinned Temurin 25.0.5+8 LTS"
+    scratch="$(mktemp -d)"
+    trap 'rm -rf -- "$scratch"' EXIT
+    curl --fail --location --retry 3 \
+        'https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.5%2B8/OpenJDK25U-jdk_x64_linux_hotspot_25.0.5_8.tar.gz' \
+        -o "$scratch/jdk.tar.gz"
+    echo "68982529869257d0ee6b824ec5aa270ff8b118bb438670da0b97ebdab178d7fb  $scratch/jdk.tar.gz" | sha256sum --check
+    mkdir "$scratch/jdk"
+    tar -xzf "$scratch/jdk.tar.gz" -C "$scratch/jdk" --strip-components=1
+    mkdir -p "$(dirname -- "$JAVA_HOME")"
+    mv "$scratch/jdk" "$JAVA_HOME"
+    rm -rf -- "$scratch"
+    trap - EXIT
+fi
+
+if [[ ! -x "$ANDROID_HOME/cmdline-tools/23.0/bin/sdkmanager" ]]; then
+    echo "[setup +${SECONDS}s] Installing pinned Android command-line tools"
+    scratch="$(mktemp -d)"
+    trap 'rm -rf -- "$scratch"' EXIT
+    curl --fail --location --retry 3 \
+        https://dl.google.com/android/repository/commandlinetools-linux-16111833_latest.zip \
+        -o "$scratch/tools.zip"
+    echo "0877a1d048fe4a24efe2eff536ca4223f7adeb58648bb81909d33c446918cfa8  $scratch/tools.zip" | sha256sum --check
+    unzip -q "$scratch/tools.zip" -d "$scratch"
+    mkdir -p "$ANDROID_HOME/cmdline-tools"
+    mv "$scratch/cmdline-tools" "$ANDROID_HOME/cmdline-tools/23.0"
+    rm -rf -- "$scratch"
+    trap - EXIT
+fi
+
+if [[ ! -f "$ANDROID_HOME/platforms/android-37.2/source.properties" ||
+      ! -f "$ANDROID_HOME/build-tools/37.0.0/source.properties" ||
+      ! -x "$ANDROID_HOME/platform-tools/adb" ]]; then
+    echo "[setup +${SECONDS}s] Accepting Android SDK licenses and installing SDK 37.2"
+    # Avoid yes | sdkmanager: pipefail can turn yes's SIGPIPE into a setup failure.
+    answers="$(mktemp)"
+    trap 'rm -f -- "$answers"' EXIT
+    printf 'y\n%.0s' {1..100} > "$answers"
+    sdkmanager --sdk_root="$ANDROID_HOME" --licenses < "$answers"
+    sdkmanager --sdk_root="$ANDROID_HOME" \
+        'platform-tools' 'platforms;android-37.2' 'build-tools;37.0.0' < "$answers"
+    rm -f -- "$answers"
+    trap - EXIT
+fi
+
+# Amp and supervised services start in new login shells, not this setup process.
+env_file="$HOME/.config/amp/bewegungswelt-radar.env"
+mkdir -p "$(dirname -- "$env_file")"
+cat > "$env_file" <<EOF
+export JAVA_HOME="$JAVA_HOME"
+export ANDROID_HOME="$ANDROID_HOME"
+export ANDROID_SDK_ROOT="\$ANDROID_HOME"
+export PATH="\$JAVA_HOME/bin:\$ANDROID_HOME/cmdline-tools/23.0/bin:\$ANDROID_HOME/platform-tools:\$PATH"
+EOF
+
+# Migrate the original inline exports; future pins update only the env file.
+if grep -Fqx '# Bewegungswelt Radar orb environment' "$HOME/.bash_profile" 2>/dev/null; then
+    sed -i '/^# Bewegungswelt Radar orb environment$/,/^esac$/d' "$HOME/.bash_profile"
+fi
+marker="# Bewegungswelt Radar orb environment v2"
+if ! grep -Fqx "$marker" "$HOME/.bash_profile" 2>/dev/null; then
+    cat >> "$HOME/.bash_profile" <<EOF
+
+$marker
+case "\$PWD/" in
+    "$repo_root/"*)
+        source "$env_file"
+        ;;
+esac
+EOF
+fi
+
+echo "[setup +${SECONDS}s] Building, testing, linting, and warming Gradle caches"
+./gradlew --no-daemon --console=plain test lintDebug assembleDebug
+echo "[setup] Ready in $((SECONDS - started))s"

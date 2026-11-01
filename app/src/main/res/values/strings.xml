@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Bewegungswelt Radar</string>
+    <string name="venue_name">Bewegungswelt Waldau</string>
+    <string name="demo_notice">Demodaten · Keine Live-Verfügbarkeit</string>
+    <string name="bookable">Buchbar</string>
+    <string name="booked">Gebucht</string>
+    <string name="closed">Geschlossen</string>
+    <string name="unknown">Unbekannt</string>
+    <string name="calendar_heading">Beispielkalender</string>
+</resources>
