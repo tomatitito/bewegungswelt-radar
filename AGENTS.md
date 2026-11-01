@@ -4,9 +4,9 @@
 
 This is a **native Android app built with Kotlin and Jetpack Compose**, not a web
 app. The first use case is visualizing Bewegungswelt Waldau calendar and
-availability data through Locaboo. Start read-only. The current foundation shows
-synthetic fixtures; a live adapter and availability engine are implemented but
-not connected to the UI yet. See [PLAN.md](PLAN.md) for remaining integration.
+availability data through Locaboo. Start read-only. The calendar is connected to
+the anonymous live adapter; synthetic fixtures remain in previews and tests.
+Hardening and opt-in new-slot notifications are tracked in [PLAN.md](PLAN.md).
 
 Newly available slot notifications are a required use case, not a speculative
 extension. After reliable live availability is in place, support opt-in Android

@@ -27,17 +27,22 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -58,9 +64,15 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import de.bewegungswelt.radar.model.Slot
+import de.bewegungswelt.radar.availability.calculateAvailability
+import de.bewegungswelt.radar.model.BookingRules
+import de.bewegungswelt.radar.model.CalendarRange
+import de.bewegungswelt.radar.model.CalendarSnapshot
 import de.bewegungswelt.radar.model.SlotStatus
+import de.bewegungswelt.radar.model.TimeWindow
 import java.time.DayOfWeek
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -79,6 +91,7 @@ private val CalendarZone = ZoneId.of("Europe/Berlin")
 private val FullDate = DateTimeFormatter.ofPattern("EEEE, d. MMMM yyyy", Locale.GERMAN)
 private val MonthLabel = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.GERMAN)
 private val TimeLabel = DateTimeFormatter.ofPattern("HH:mm").withZone(CalendarZone)
+private val FetchLabel = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale.GERMAN).withZone(CalendarZone)
 
 @Composable
 internal fun CalendarTheme(content: @Composable () -> Unit) {
@@ -97,10 +110,13 @@ internal fun CalendarTheme(content: @Composable () -> Unit) {
     )
 }
 
-/** Receives already interpreted slots through a pure lookup; never fetches provider data. */
+/** Renders interpreted state and reports the visible period; never calls a provider. */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun CalendarScreen(
-    slotsForDay: (LocalDate) -> List<Slot>,
+    state: CalendarUiState,
+    onRangeChanged: (CalendarRange) -> Unit,
+    onRefresh: () -> Unit,
     today: LocalDate = LocalDate.now(CalendarZone),
 ) {
     var selectedEpoch by rememberSaveable { mutableLongStateOf(today.toEpochDay()) }
@@ -110,13 +126,33 @@ internal fun CalendarScreen(
     val selected = LocalDate.ofEpochDay(selectedEpoch)
     val month = YearMonth.from(LocalDate.ofEpochDay(monthEpoch))
     val weekStart = selected.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-    val slots = slotsForDay(selected)
+    val range = if (monthMode) CalendarRange(month.atDay(1), month.plusMonths(1).atDay(1))
+        else CalendarRange(weekStart, weekStart.plusDays(7))
+    // Navigation must not briefly present the previous period's data as confirmed.
+    val visibleState = if (state.range == range) state else CalendarUiState(range = range)
+    val days = remember(visibleState) {
+        if (visibleState.confirmed) visibleState.slots.groupBy { it.window.start.atZone(CalendarZone).toLocalDate() }
+        else emptyMap()
+    }
+    val slots = days[selected].orEmpty().filter { slot ->
+        slot.status == SlotStatus.UNKNOWN || visibleState.snapshot?.openingWindows.orEmpty().any {
+            it.start < slot.window.endExclusive && slot.window.start < it.endExclusive
+        }
+    }
     val scroll = rememberScrollState()
     val largeText = LocalDensity.current.fontScale > 1.3f
     val timeFraction = if (largeText) 0.35f else 0.25f
+    val pullState = rememberPullToRefreshState()
     LaunchedEffect(monthMode) { scroll.scrollTo(0) }
+    LaunchedEffect(range) {
+        detailStart = null
+        onRangeChanged(range)
+    }
 
-    Surface(color = Background, modifier = Modifier.fillMaxSize()) {
+    Surface(
+        color = Background,
+        modifier = Modifier.fillMaxSize().pullToRefresh(visibleState.loading, pullState, onRefresh = onRefresh),
+    ) {
         Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing), contentAlignment = Alignment.TopCenter) {
             Column(
                 Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(scroll).padding(16.dp),
@@ -126,12 +162,33 @@ internal fun CalendarScreen(
                     Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text(stringResource(R.string.venue_name), color = SecondaryText, style = MaterialTheme.typography.titleMedium)
                 }
-                Text(
-                    stringResource(R.string.demo_notice),
-                    color = Color(0xFFFFA5A9),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.fillMaxWidth().background(Color(0xFF3A2325), RoundedCornerShape(10.dp)).padding(12.dp),
-                )
+                Column(
+                    Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(10.dp)).padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            stringResource(if (visibleState.loading) R.string.loading else if (visibleState.diagnostic != null) R.string.load_failed else R.string.live_source),
+                            Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium,
+                            color = if (visibleState.diagnostic != null) Color(0xFFFFA5A9) else SecondaryText,
+                        )
+                        TextButton(onClick = onRefresh, enabled = !visibleState.loading) {
+                            Text(stringResource(R.string.refresh))
+                        }
+                    }
+                    if (visibleState.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    else if (pullState.distanceFraction > 0f) LinearProgressIndicator(
+                        progress = { pullState.distanceFraction.coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    visibleState.diagnostic?.let { Text(it.message, style = MaterialTheme.typography.bodyMedium) }
+                    visibleState.snapshot?.let {
+                        Text(
+                            stringResource(if (visibleState.confirmed) R.string.fetched_at else R.string.stale_at, FetchLabel.format(it.fetchedAt)),
+                            style = MaterialTheme.typography.bodySmall, color = SecondaryText,
+                        )
+                    }
+                }
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).border(1.dp, Outline, RoundedCornerShape(12.dp))
                         .background(Panel).padding(3.dp).selectableGroup(),
@@ -187,7 +244,9 @@ internal fun CalendarScreen(
                                     val number = row * 7 + column - offset + 1
                                     if (number in 1..month.lengthOfMonth()) {
                                         val date = month.atDay(number)
-                                        DayCell(date, date == selected, slotsForDay(date).any { it.status == SlotStatus.BOOKABLE }, false, Modifier.weight(1f)) {
+                                        val daySlots = days[date].orEmpty()
+                                        DayCell(date, date == selected, daySlots.any { it.status == SlotStatus.BOOKABLE },
+                                            visibleState.confirmed && daySlots.none { it.status == SlotStatus.UNKNOWN }, false, Modifier.weight(1f)) {
                                             selectedEpoch = date.toEpochDay()
                                             monthMode = false
                                         }
@@ -199,44 +258,55 @@ internal fun CalendarScreen(
                         Row(Modifier.fillMaxWidth()) {
                             repeat(7) { index ->
                                 val date = weekStart.plusDays(index.toLong())
-                                DayCell(date, date == selected, slotsForDay(date).any { it.status == SlotStatus.BOOKABLE }, true, Modifier.weight(1f)) {
+                                val daySlots = days[date].orEmpty()
+                                DayCell(date, date == selected, daySlots.any { it.status == SlotStatus.BOOKABLE },
+                                    visibleState.confirmed && daySlots.none { it.status == SlotStatus.UNKNOWN }, true, Modifier.weight(1f)) {
                                     selectedEpoch = date.toEpochDay()
                                 }
                             }
                         }
                     }
                 }
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(selected.format(FullDate), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.slot_duration), color = SecondaryText, style = MaterialTheme.typography.bodyMedium)
-                }
-                Column(Modifier.fillMaxWidth().border(1.dp, Outline, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))) {
-                    Row(Modifier.fillMaxWidth().background(Panel).padding(horizontal = 12.dp, vertical = 10.dp)) {
-                        Text(stringResource(R.string.time), Modifier.weight(timeFraction), color = SecondaryText, style = MaterialTheme.typography.labelMedium)
-                        Text(stringResource(R.string.status), Modifier.weight(1f - timeFraction), color = SecondaryText, style = MaterialTheme.typography.labelMedium)
+                if (!monthMode) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(selected.format(FullDate), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.slot_duration), color = SecondaryText, style = MaterialTheme.typography.bodyMedium)
+                        visibleState.snapshot?.bookingRules?.let {
+                            val minutes = it.minimumDuration.toMinutes()
+                            Text(pluralStringResource(R.plurals.minimum_duration, minutes.toInt(), minutes), color = SecondaryText, style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
-                    if (slots.isEmpty()) Text(stringResource(R.string.no_slots), Modifier.padding(16.dp))
-                    slots.forEach { slot ->
-                        HorizontalDivider(color = Outline)
-                        val label = stringResource(statusLabel(slot.status))
-                        val description = stringResource(R.string.slot_description, TimeLabel.format(slot.window.start), TimeLabel.format(slot.window.endExclusive), label)
-                        Row(
-                            Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = stringResource(R.string.slot_details)) {
-                                detailStart = slot.window.start.toString()
-                            }.semantics(mergeDescendants = true) { contentDescription = description }
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(TimeLabel.format(slot.window.start), Modifier.weight(timeFraction), style = MaterialTheme.typography.bodyLarge)
+                    Column(Modifier.fillMaxWidth().border(1.dp, Outline, RoundedCornerShape(12.dp)).clip(RoundedCornerShape(12.dp))) {
+                        Row(Modifier.fillMaxWidth().background(Panel).padding(horizontal = 12.dp, vertical = 10.dp)) {
+                            Text(stringResource(R.string.time), Modifier.weight(timeFraction), color = SecondaryText, style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.status), Modifier.weight(1f - timeFraction), color = SecondaryText, style = MaterialTheme.typography.labelMedium)
+                        }
+                        if (slots.isEmpty()) Text(
+                            stringResource(if (visibleState.confirmed) R.string.no_slots else R.string.availability_unconfirmed),
+                            Modifier.padding(16.dp),
+                        )
+                        slots.forEach { slot ->
+                            HorizontalDivider(color = Outline)
+                            val label = stringResource(statusLabel(slot.status))
+                            val description = stringResource(R.string.slot_description, TimeLabel.format(slot.window.start), label)
                             Row(
-                                Modifier.weight(1f - timeFraction).background(statusColor(slot.status), RoundedCornerShape(8.dp)).padding(12.dp),
+                                Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = stringResource(R.string.slot_details)) {
+                                    detailStart = slot.window.start.toString()
+                                }.semantics(mergeDescendants = true) { contentDescription = description }
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                if (!largeText) {
-                                    SlotIcon(slot.status)
-                                    Spacer(Modifier.width(8.dp))
+                                Text(TimeLabel.format(slot.window.start), Modifier.weight(timeFraction), style = MaterialTheme.typography.bodyLarge)
+                                Row(
+                                    Modifier.weight(1f - timeFraction).background(statusColor(slot.status), RoundedCornerShape(8.dp)).padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    if (!largeText) {
+                                        SlotIcon(slot.status)
+                                        Spacer(Modifier.width(8.dp))
+                                    }
+                                    Text(label, color = statusTextColor(slot.status), style = MaterialTheme.typography.bodyLarge)
                                 }
-                                Text(label, color = statusTextColor(slot.status), style = MaterialTheme.typography.bodyLarge)
                             }
                         }
                     }
@@ -253,8 +323,12 @@ internal fun CalendarScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(selected.format(FullDate))
-                    Text("${TimeLabel.format(slot.window.start)} – ${TimeLabel.format(slot.window.endExclusive)}")
+                    Text(stringResource(R.string.start_at, TimeLabel.format(slot.window.start)))
                     Text(stringResource(statusLabel(slot.status)))
+                    if (slot.status == SlotStatus.BOOKABLE) visibleState.snapshot?.bookingRules?.let {
+                        val minutes = it.minimumDuration.toMinutes()
+                        Text(pluralStringResource(R.plurals.minimum_duration, minutes.toInt(), minutes))
+                    }
                     Text(stringResource(R.string.read_only_details), color = SecondaryText)
                 }
             },
@@ -280,8 +354,10 @@ private fun NavigationArrow(next: Boolean, month: Boolean, onClick: () -> Unit) 
 }
 
 @Composable
-private fun DayCell(date: LocalDate, selected: Boolean, bookable: Boolean, week: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val description = date.format(FullDate) + ", " + stringResource(if (bookable) R.string.day_bookable else R.string.day_no_bookable)
+private fun DayCell(date: LocalDate, selected: Boolean, bookable: Boolean, confirmed: Boolean, week: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val description = date.format(FullDate) + ", " + stringResource(
+        if (bookable) R.string.day_bookable else if (confirmed) R.string.day_no_bookable else R.string.availability_unconfirmed,
+    )
     val shape = RoundedCornerShape(8.dp)
     Column(
         modifier.padding(2.dp).clip(shape)
@@ -346,5 +422,14 @@ private fun SlotIcon(status: SlotStatus) {
 @Preview(showBackground = true, locale = "de", widthDp = 360)
 @Composable
 private fun CalendarPreview() {
-    CalendarTheme { CalendarScreen(::demoSlots, today = LocalDate.of(2026, 11, 2)) }
+    val date = LocalDate.of(2026, 11, 2)
+    val range = CalendarRange(date, date.plusDays(7))
+    val start = date.atTime(9, 0).atZone(CalendarZone).toInstant()
+    val snapshot = CalendarSnapshot(range, listOf(TimeWindow(start, start.plusSeconds(7200))),
+        listOf(TimeWindow(start.plusSeconds(3600), start.plusSeconds(5400))), emptyList(),
+        Instant.parse("2026-11-01T10:00:00Z"), BookingRules(Duration.ofMinutes(60), Duration.ofMinutes(30)))
+    CalendarTheme {
+        CalendarScreen(CalendarUiState(range, snapshot, calculateAvailability(range, snapshot, snapshot.fetchedAt), loading = false),
+            onRangeChanged = {}, onRefresh = {}, today = date)
+    }
 }

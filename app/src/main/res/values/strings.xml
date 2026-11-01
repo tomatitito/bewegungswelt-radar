@@ -1,10 +1,16 @@
 <resources>
     <string name="app_name">Bewegungswelt Radar</string>
     <string name="venue_name">Bewegungswelt Waldau</string>
-    <string name="demo_notice">Demodaten · Keine Live-Verfügbarkeit</string>
+    <string name="live_source">Kalender von Locaboo</string>
+    <string name="loading">Verfügbarkeit wird geladen …</string>
+    <string name="load_failed">Abruf fehlgeschlagen</string>
+    <string name="refresh">Aktualisieren</string>
+    <string name="fetched_at">Stand %1$s · Europe/Berlin</string>
+    <string name="stale_at">Letzter Stand %1$s · nicht mehr bestätigt</string>
+    <string name="availability_unconfirmed">Verfügbarkeit unbestätigt</string>
     <string name="bookable">Buchbar</string>
     <string name="booked">Gebucht</string>
-    <string name="closed">Geschlossen</string>
+    <string name="closed">Nicht buchbar</string>
     <string name="unknown">Unbekannt</string>
     <string name="week">Woche</string>
     <string name="month">Monat</string>
@@ -13,15 +19,20 @@
     <string name="next_month">Nächster Monat</string>
     <string name="previous_week">Vorherige Woche</string>
     <string name="next_week">Nächste Woche</string>
-    <string name="slot_duration">30-Minuten-Zeitfenster</string>
-    <string name="time">ZEIT</string>
+    <string name="slot_duration">Startzeiten im 30-Minuten-Raster</string>
+    <plurals name="minimum_duration">
+        <item quantity="one">Mindestens %1$d Minute Buchungsdauer</item>
+        <item quantity="other">Mindestens %1$d Minuten Buchungsdauer</item>
+    </plurals>
+    <string name="time">START</string>
     <string name="status">STATUS</string>
-    <string name="day_bookable">Mindestens ein buchbares Zeitfenster</string>
-    <string name="day_no_bookable">Kein bestätigtes buchbares Zeitfenster</string>
-    <string name="no_slots">Keine Zeitfenster vorhanden</string>
-    <string name="slot_description">%1$s bis %2$s, %3$s</string>
-    <string name="slot_details">Zeitfenster</string>
-    <string name="read_only_details">Demodaten · Nur Anzeige. Keine Buchung in der App.</string>
+    <string name="day_bookable">Mindestens ein buchbarer Start</string>
+    <string name="day_no_bookable">Kein buchbarer Start</string>
+    <string name="no_slots">Keine Öffnungszeiten an diesem Tag</string>
+    <string name="slot_description">%1$s, %2$s</string>
+    <string name="slot_details">Buchungsstart</string>
+    <string name="start_at">Start: %1$s</string>
+    <string name="read_only_details">Nur Anzeige, keine Reservierung. Verfügbarkeit und Buchungsregeln im Locaboo-Portal erneut prüfen. Keine Buchung in der App.</string>
     <string name="close">Schließen</string>
     <string name="read_only_footer">Nur Anzeige · Europe/Berlin</string>
 </resources>

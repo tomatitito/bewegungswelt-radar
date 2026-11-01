@@ -1,17 +1,26 @@
 # Bewegungswelt Radar
 
-Read-only Android calendar for Bewegungswelt Waldau. This foundation displays a
-**synthetic example calendar**, not live availability. See [PLAN.md](PLAN.md) for
-the remaining app integration, notifications, and production UI work. The live
-Locaboo adapter and availability engine are implemented and tested independently;
-the Android screen is not connected to them yet.
+Read-only Android calendar for Bewegungswelt Waldau, using anonymous live
+Locaboo data. See [PLAN.md](PLAN.md) for the remaining hardening and opt-in
+newly-available-slot notifications. There are no booking or payment actions.
 
 The dark calendar opens on the current week in `Europe/Berlin`. Switch to
 **Monat** to browse dates; tapping a date opens its week with that day selected.
 Forest green means at least one bookable slot, while warm gray marks selection.
-The timetable shows start times for 30-minute slots; tap a row for the full time
-range and status. Details are read-only, with no booking action. All availability
-is synthetic, including the illustrative green dates repeated in each month.
+The timetable shows possible booking starts on a 30-minute grid inside opening
+windows, not 30-minute bookings. `Buchbar` requires at least the published minimum
+duration (currently 60 minutes) to remain free; `Nicht buchbar` also covers past
+starts, restrictions, and insufficient remaining time, not just closed doors.
+Tap a row for read-only details, and recheck rules and availability in Locaboo
+before booking. Server-side booking acceptance is not guaranteed by this display.
+
+Navigation loads the visible week or month. Pull down or tap **Aktualisieren**
+to refresh; returning to the foreground also refreshes the current period.
+The fetch time is shown in venue time. While loading or after a failure, dates
+are unconfirmed and old green slots are hidden. A failed refresh retains only
+the previous snapshot in memory for its timestamp/rules, not confirmed slots;
+there is no disk cache. Navigation cancels obsolete requests. Past starts are
+re-evaluated every 30 seconds while foregrounded, without background polling.
 Selection and view mode survive activity recreation. Large text uses more space
 for times and omits decorative status icons, keeping the status labels visible.
 
@@ -30,8 +39,9 @@ Set `JAVA_HOME` and `ANDROID_HOME` to the installed toolchains, or open the proj
 in Android Studio and select JDK 25. Java/Kotlin bytecode remains targeted to Java
 17; upgrading the build JDK does not raise the minimum supported Android version.
 AGP's built-in Kotlin support replaces the separate Kotlin Android plugin.
-No secrets, environment templates, accounts, databases, or network permissions
-are required by the app.
+No secrets, environment templates, accounts, or databases are required. The app
+declares Android's normal `INTERNET` permission; it has no runtime permission
+prompt for read-only calendar access.
 
 ```sh
 ./gradlew --no-daemon test lintDebug assembleDebug
@@ -43,7 +53,8 @@ connected Android device with `adb install -r app/build/outputs/apk/debug/app-de
 
 ## Modules
 
-- `app`: Android composition root and fixture-backed Compose screen.
+- `app`: Android composition root, lifecycle-aware `CalendarViewModel`, and live
+  Compose calendar. Synthetic data is limited to previews and offline tests.
 - `core:model`: Android-independent calendar intervals, slots, statuses, diagnostics.
 - `core:availability`: `AvailabilitySource` contract and deterministic half-hour
   booking-start calculation, including minimum duration, restrictions, and DST.

@@ -71,10 +71,11 @@ Rules:
   <ReadOnlySlotDetails />
 ```
 
-The fixture-backed UI now implements the dark forest-green design, start-time-only
-rows, and month-to-week selection. Green dates have at least one bookable slot;
-warm gray indicates selection. There is no separate status legend. Live-source
-loading, refresh, stale/error states, and diagnostics remain planned below.
+The live UI implements the dark forest-green design, start-time-only rows, and
+month-to-week selection. Green dates have at least one eligible bookable start;
+warm gray indicates selection. Loading and failures clear confirmed starts and
+show unconfirmed dates, a sanitized diagnostic, and the previous fetch time when
+available. There is no separate status legend or persistent offline cache.
 
 Initial behavior:
 
@@ -83,7 +84,8 @@ Initial behavior:
 - pull-to-refresh
 - loading, stale-data, empty, and error states
 - color plus text/icon; status never communicated by color alone
-- booking details contain only date, start, end, and status
+- booking details contain only date, start, minimum duration, and status;
+  the half-hour display interval must not be presented as the booking duration
 
 On narrow screens, show the selected day's timetable with a week strip instead
 of shrinking seven timetable columns beyond readability. Tapping a month date
@@ -157,9 +159,10 @@ HTTP contract tests run offline. Published offers inform the 60-minute minimum;
 server-side booking acceptance and a populated live earliest-start response are
 not verified. See [provider notes](provider-locaboo/README.md).
 
-**Remaining:** connect the adapter and engine to a `CalendarViewModel`, add Android
-network permission, and replace production fixture wiring with loading, refresh,
-and failure handling. The Android UI still shows synthetic slots.
+**App integration implemented:** lifecycle-aware `CalendarViewModel`, Android
+network permission, navigation-driven requests, pull/button refresh and foreground
+refresh, fail-closed loading/error states, and in-memory fetch timestamps.
+Production no longer uses synthetic slots. Notifications are not implemented yet.
 
 - implement cookie-preserving HTTP client
 - reproduce opening-hours and bookings requests
@@ -169,6 +172,11 @@ and failure handling. The Android UI still shows synthetic slots.
 **Exit:** app loads real Bewegungswelt calendar without person-related data.
 
 ### Phase 4 — production calendar UI
+
+**Implemented:** live week/day and month navigation, refresh, unknown/error and
+last-fetch states, minimum-duration explanation, accessible status labels,
+offline Compose tests on API 26/36, and device-free native renders. A real Android
+device interaction check remains necessary; no device is connected in the orb.
 
 - implement responsive week/day calendar
 - add navigation, refresh, accessibility, stale state, and errors
