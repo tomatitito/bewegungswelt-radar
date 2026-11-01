@@ -4,6 +4,15 @@ Read-only Android calendar for Bewegungswelt Waldau. This foundation displays a
 **synthetic example calendar**, not live availability. See [PLAN.md](PLAN.md) for
 the remaining availability engine, Locaboo integration, and production UI work.
 
+The dark calendar opens on the current week in `Europe/Berlin`. Switch to
+**Monat** to browse dates; tapping a date opens its week with that day selected.
+Forest green means at least one bookable slot, while warm gray marks selection.
+The timetable shows start times for 30-minute slots; tap a row for the full time
+range and status. Details are read-only, with no booking action. All availability
+is synthetic, including the illustrative green dates repeated in each month.
+Selection and view mode survive activity recreation. Large text uses more space
+for times and omits decorative status icons, keeping the status labels visible.
+
 ## Build and check
 
 - Temurin JDK **25.0.5+8 LTS** (build and test runtime)
@@ -28,7 +37,7 @@ are required by the app.
 
 The debug APK is at `app/build/outputs/apk/debug/app-debug.apk`. Install it on a
 connected Android device with `adb install -r app/build/outputs/apk/debug/app-debug.apk`.
-`CalendarPreview` in `MainActivity.kt` provides an Android Studio Compose preview.
+`CalendarPreview` in `CalendarScreen.kt` provides an Android Studio Compose preview.
 
 ## Modules
 

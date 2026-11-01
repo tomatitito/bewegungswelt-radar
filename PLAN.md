@@ -61,15 +61,17 @@ Rules:
 
 ```text
 <CalendarScreen>
-  <TopAppBar />
-  <WeekNavigator />
-  <CalendarGrid>
-    day columns
-    30-minute rows
-    slot cells
-  <Legend />
-  <SourceDiagnostics />
+  <WeekMonthSwitch />
+  <PeriodNavigator />
+  <MonthGrid /> or <WeekStrip />
+  <SelectedDayTimetable />
+  <ReadOnlySlotDetails />
 ```
+
+The fixture-backed UI now implements the dark forest-green design, start-time-only
+rows, and month-to-week selection. Green dates have at least one bookable slot;
+warm gray indicates selection. There is no separate status legend. Live-source
+loading, refresh, stale/error states, and diagnostics remain planned below.
 
 Initial behavior:
 
@@ -80,7 +82,9 @@ Initial behavior:
 - color plus text/icon; status never communicated by color alone
 - booking details contain only date, start, end, and status
 
-On narrow screens, show day pager with week strip instead of shrinking seven columns beyond readability.
+On narrow screens, show the selected day's timetable with a week strip instead
+of shrinking seven timetable columns beyond readability. Tapping a month date
+opens week mode with that date selected. Slot details remain read-only.
 
 ## Delivery phases
 

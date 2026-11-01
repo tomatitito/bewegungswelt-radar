@@ -6,5 +6,22 @@
     <string name="booked">Gebucht</string>
     <string name="closed">Geschlossen</string>
     <string name="unknown">Unbekannt</string>
-    <string name="calendar_heading">Beispielkalender</string>
+    <string name="week">Woche</string>
+    <string name="month">Monat</string>
+    <string name="today">Heute</string>
+    <string name="previous_month">Vorheriger Monat</string>
+    <string name="next_month">Nächster Monat</string>
+    <string name="previous_week">Vorherige Woche</string>
+    <string name="next_week">Nächste Woche</string>
+    <string name="slot_duration">30-Minuten-Zeitfenster</string>
+    <string name="time">ZEIT</string>
+    <string name="status">STATUS</string>
+    <string name="day_bookable">Mindestens ein buchbares Zeitfenster</string>
+    <string name="day_no_bookable">Kein bestätigtes buchbares Zeitfenster</string>
+    <string name="no_slots">Keine Zeitfenster vorhanden</string>
+    <string name="slot_description">%1$s bis %2$s, %3$s</string>
+    <string name="slot_details">Zeitfenster</string>
+    <string name="read_only_details">Demodaten · Nur Anzeige. Keine Buchung in der App.</string>
+    <string name="close">Schließen</string>
+    <string name="read_only_footer">Nur Anzeige · Europe/Berlin</string>
 </resources>
