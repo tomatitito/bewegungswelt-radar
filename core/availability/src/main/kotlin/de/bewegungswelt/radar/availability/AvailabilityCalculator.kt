@@ -17,13 +17,15 @@ fun calculateAvailability(range: CalendarRange, snapshot: CalendarSnapshot?, now
     val coverageStart = snapshot?.range?.let { it.start.atStartOfDay(it.zone).toInstant() }
     val coverageEnd = snapshot?.range?.let { it.endExclusive.atStartOfDay(it.zone).toInstant() }
     val rules = snapshot?.bookingRules
+    val horizon = snapshot?.bookingHorizonEndExclusive
     val halfHour = Duration.ofMinutes(30)
 
     fun status(window: TimeWindow): SlotStatus {
         if (coverageStart == null || coverageEnd == null ||
             window.start < coverageStart || window.endExclusive > coverageEnd
         ) return SlotStatus.UNKNOWN
-        if (window.start < now || restrictions.any { it.overlaps(window) } ||
+        if (window.start < now || (horizon != null && window.endExclusive > horizon) ||
+            restrictions.any { it.overlaps(window) } ||
             openings.none { it.contains(window) }
         ) return SlotStatus.CLOSED
         if (bookings.any { it.overlaps(window) }) return SlotStatus.BOOKED
@@ -33,6 +35,7 @@ fun calculateAvailability(range: CalendarRange, snapshot: CalendarSnapshot?, now
         val aligned = sinceMidnight.isZero ||
             (rules.startInterval <= sinceMidnight && sinceMidnight.toNanos() % rules.startInterval.toNanos() == 0L)
         if (!aligned) return SlotStatus.CLOSED
+        if (horizon != null && rules.minimumDuration > Duration.between(window.start, horizon)) return SlotStatus.CLOSED
         // Check coverage before constructing a possibly enormous minimum-duration interval.
         if (rules.minimumDuration > Duration.between(window.start, coverageEnd)) return SlotStatus.UNKNOWN
         val booking = TimeWindow(window.start, window.start.plus(rules.minimumDuration))

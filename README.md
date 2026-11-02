@@ -1,8 +1,8 @@
 # Bewegungswelt Radar
 
 Read-only Android calendar for Bewegungswelt Waldau, using anonymous live
-Locaboo data. See [PLAN.md](PLAN.md) for the remaining hardening and opt-in
-newly-available-slot notifications. There are no booking or payment actions.
+Locaboo data, with opt-in newly-available-slot notifications. See [PLAN.md](PLAN.md)
+for remaining hardening and device validation. There are no booking or payment actions.
 
 The dark calendar opens on the current week in `Europe/Berlin`. Switch to
 **Monat** to browse dates; tapping a date opens its week with that day selected.
@@ -24,6 +24,44 @@ re-evaluated every 30 seconds while foregrounded, without background polling.
 Selection and view mode survive activity recreation. Large text uses more space
 for times and omits decorative status icons, keeping the status labels visible.
 
+## Newly available times
+
+Open **Neue freie Zeiten · Benachrichtigungen** to opt in. Monitor all opening
+days/times over the full verified Locaboo booking horizon, including new date
+releases beyond 60 days. The minimum continuous free duration defaults to
+**60 minutes**, selectable as 60/90/120; this is one minimum, not three threshold
+alerts. The venue's minimum and allowed start times still apply. Disjoint free
+periods never add up to a qualifying interval.
+
+Checks default to roughly **hourly**, selectable as 15/30/60/120/360 minutes.
+WorkManager requires a network connection and uses failure backoff. Android may
+delay checks, including after reboot or while idle; brief openings can be missed.
+There is no real-time guarantee. Android notification permission is requested
+only on activation (API 33+); channel settings and Do Not Disturb govern delivery.
+Denial leaves the calendar usable. Disable monitoring from the same dialog.
+
+The first complete scan is silent. Cancellations, lifted restrictions, and newly
+released dates can then alert; unchanged availability does not repeat across
+restarts. Duration/booking-rule changes or re-enabling create a silent baseline;
+cadence changes retain it. Adjacent new booking **starts** are grouped per date.
+Multi-date releases use one audible Android group summary and up to seven date
+cards; all dates remain accessible in the calendar. Tapping opens a date and
+refreshes it. An alert neither reserves nor guarantees a slot.
+
+Only anonymous future start/status comparisons, source/rule identity, the verified
+horizon, preferences and check time are persisted privately. No snapshots, raw
+responses, cookies or personal booking data are persisted. Failed/incomplete or
+unknown scans preserve the last confirmed state and release boundary. Blocked
+notifications do not queue a backlog for later permission restoration. Comparison
+state is saved before notification dispatch to favor at-most-once delivery: a
+process death between saving and posting may lose an alert rather than repeat it.
+Scans use at most 62 days per request and an eight-minute work budget. An
+implausible horizon over ten years fails closed instead of silently truncating.
+
+Validation is offline JVM/Compose native rendering on APIs 26/36. A real-device
+smoke test remains required for background timing, runtime permissions, reboot,
+notification taps and DND behavior; no Android device is connected in the orb.
+
 ## Build and check
 
 - Temurin JDK **25.0.5+8 LTS** (build and test runtime)
@@ -32,7 +70,7 @@ for times and omits decorative status icons, keeping the status labels visible.
 - Kotlin **2.4.21**, Android Gradle Plugin **9.5.0**; dependencies are pinned in
   `gradle/libs.versions.toml`
 - Compose BOM **2026.09.00**, Activity **1.13.0**, Lifecycle **2.11.0**,
-  Robolectric **4.17**
+  WorkManager **2.12.0**, Robolectric **4.17**
 - Android **8.0 / API 26** or newer to run the app
 
 Set `JAVA_HOME` and `ANDROID_HOME` to the installed toolchains, or open the project

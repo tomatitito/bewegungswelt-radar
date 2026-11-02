@@ -118,6 +118,9 @@ internal fun CalendarScreen(
     onRangeChanged: (CalendarRange) -> Unit,
     onRefresh: () -> Unit,
     today: LocalDate = LocalDate.now(CalendarZone),
+    openDate: LocalDate? = null,
+    openRequest: Int = 0,
+    onOpenNotifications: () -> Unit = {},
 ) {
     var selectedEpoch by rememberSaveable { mutableLongStateOf(today.toEpochDay()) }
     var monthEpoch by rememberSaveable { mutableLongStateOf(today.withDayOfMonth(1).toEpochDay()) }
@@ -143,6 +146,12 @@ internal fun CalendarScreen(
     val largeText = LocalDensity.current.fontScale > 1.3f
     val timeFraction = if (largeText) 0.35f else 0.25f
     val pullState = rememberPullToRefreshState()
+    LaunchedEffect(openDate, openRequest) {
+        openDate?.let {
+            selectedEpoch = it.toEpochDay()
+            monthMode = false
+        }
+    }
     LaunchedEffect(monthMode) { scroll.scrollTo(0) }
     LaunchedEffect(range) {
         detailStart = null
@@ -161,6 +170,7 @@ internal fun CalendarScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Text(stringResource(R.string.venue_name), color = SecondaryText, style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = onOpenNotifications) { Text("Neue freie Zeiten · Benachrichtigungen") }
                 }
                 Column(
                     Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(10.dp)).padding(12.dp),

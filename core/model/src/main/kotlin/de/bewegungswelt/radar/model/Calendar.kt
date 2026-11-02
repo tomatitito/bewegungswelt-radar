@@ -49,6 +49,8 @@ data class CalendarSnapshot(
     val bookingRules: BookingRules? = null,
     /** Non-occupancy restrictions, such as lead time and booking horizon. */
     val unavailableWindows: List<TimeWindow> = emptyList(),
+    /** Verified exclusive booking boundary, independent of the requested/fetched range. */
+    val bookingHorizonEndExclusive: Instant? = null,
 )
 
 data class SourceDescriptor(val id: String, val name: String)

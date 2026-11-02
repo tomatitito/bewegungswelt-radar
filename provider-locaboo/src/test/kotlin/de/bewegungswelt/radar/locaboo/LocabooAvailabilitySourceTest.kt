@@ -53,6 +53,7 @@ class LocabooAvailabilitySourceTest {
             val snapshot = server.source(clock).loadCalendar(range)
             assertEquals(range, snapshot.range)
             assertEquals(clock.instant(), snapshot.fetchedAt)
+            assertEquals(Instant.parse("2026-11-07T23:00:00Z"), snapshot.bookingHorizonEndExclusive)
             assertEquals(3, snapshot.openingWindows.size)
             assertEquals(window("2026-11-07T11:00:00Z", "2026-11-07T15:00:00Z"), snapshot.openingWindows[1])
             assertEquals(listOf(window("2026-11-06T15:30:00Z", "2026-11-06T16:00:00Z")), snapshot.bookings)
@@ -76,6 +77,20 @@ class LocabooAvailabilitySourceTest {
             assertEquals("424", fields["platform_widget_id"])
             assertTrue(server.requests.all { it.path in ReadPaths })
             assertTrue(server.requests.filter { it.path != PagePath }.all { it.method == "POST" })
+        }
+    }
+
+    @Test
+    fun `short discovery load exposes full verified horizon independent of requested range`() = runBlocking {
+        FixtureServer().use { server ->
+            val initial = CalendarRange(range.start, range.start.plusDays(1))
+            val snapshot = server.source(clock).loadCalendar(initial)
+            assertEquals(initial, snapshot.range)
+            assertEquals(Instant.parse("2027-04-01T22:00:00Z"), snapshot.bookingHorizonEndExclusive)
+            // Inclusive venue-local max_end_dates becomes next local midnight, including DST.
+            server.metadata = metadata(latest = "2027-03-28")
+            assertEquals(Instant.parse("2027-03-28T22:00:00Z"),
+                server.source(clock).loadCalendar(initial).bookingHorizonEndExclusive)
         }
     }
 

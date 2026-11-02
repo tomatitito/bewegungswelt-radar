@@ -140,6 +140,7 @@ class LocabooAvailabilitySource internal constructor(
             // Published private-person offers start at 60 minutes; half-hour rows are possible START times.
             bookingRules = BookingRules(Duration.ofHours(1), Duration.ofMinutes(30)),
             unavailableWindows = unavailable,
+            bookingHorizonEndExclusive = latest,
         )
     }
 

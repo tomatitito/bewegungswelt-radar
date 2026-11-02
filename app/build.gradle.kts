@@ -45,6 +45,7 @@ tasks.withType<Test>().configureEach {
 dependencies {
     implementation(project(":core:availability"))
     implementation(project(":provider-locaboo"))
+    implementation(libs.work.runtime)
     implementation(platform(libs.compose.bom))
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.runtime)
@@ -59,4 +60,5 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.compose.ui.test.junit4)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.work.testing)
 }

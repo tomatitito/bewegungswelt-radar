@@ -121,10 +121,14 @@ cancelled, a closure was lifted, or a new date was released for booking.
   notifications without breaking the calendar. Tapping an alert opens the
   relevant date and refreshes it; an alert never reserves or guarantees a slot.
 
-Before implementation, settle the monitored date horizon, weekday/time filters,
-minimum useful free duration, and desired checking cadence within Android and
-upstream limits. These preferences are not yet specified. Start with on-device
-checks; a continuously running backend or upstream push integration would be a
+Accepted preferences: all opening days/times across the full verified booking
+horizon, including future date releases rather than a fixed 60-day range. Require
+at least 60 continuous free minutes, configurable as 60/90/120; do not sum disjoint
+periods or issue separate duration-threshold alerts. Check roughly hourly,
+configurable as 15/30/60/120/360 minutes. Follow Android notification/DND settings;
+notify again only after confirmed unavailability and reopening. Multi-date checks
+use one audible group summary and at most seven date cards to bound floods.
+Start with on-device checks; a backend or upstream push integration remains a
 separate decision if faster delivery is required.
 
 ## Delivery phases
@@ -162,7 +166,7 @@ not verified. See [provider notes](provider-locaboo/README.md).
 **App integration implemented:** lifecycle-aware `CalendarViewModel`, Android
 network permission, navigation-driven requests, pull/button refresh and foreground
 refresh, fail-closed loading/error states, and in-memory fetch timestamps.
-Production no longer uses synthetic slots. Notifications are not implemented yet.
+Production no longer uses synthetic slots. Notifications are implemented in phase 6.
 
 - implement cookie-preserving HTTP client
 - reproduce opening-hours and bookings requests
@@ -194,6 +198,19 @@ device interaction check remains necessary; no device is connected in the orb.
 **Exit:** upstream failures cannot produce false `Buchbar` slots.
 
 ### Phase 6 — newly available slot notifications
+
+**Implemented, device validation pending:** opt-in preferences, configurable
+continuous minimum and cadence, network-constrained unique WorkManager checks,
+private anonymous baseline/deduplication persistence, full-horizon batched scans
+and verified release-boundary comparison, grouped Android notifications,
+permission/blocking feedback, date navigation and refresh on taps. Complete scans
+commit atomically; failures/unknowns retain confirmed history. JVM tests cover
+duration gaps, allowed starts, baselines, releases beyond 60 days, retries/restarts,
+failures/recovery, grouping, preference changes, opt-out and scheduling. Native
+Compose tests cover APIs 26/36. See README for delivery/crash semantics and limits.
+
+- Remaining: real-device calendar and notification smoke test, including runtime
+  permission grant/denial, delayed work, reboot, actual tap refresh, DND and opt-out.
 
 - define monitoring preferences and comparison semantics described above
 - persist a minimal baseline and deduplication state
