@@ -35,4 +35,20 @@
     <string name="read_only_details">Nur Anzeige, keine Reservierung. Verfügbarkeit und Buchungsregeln im Locaboo-Portal erneut prüfen. Keine Buchung in der App.</string>
     <string name="close">Schließen</string>
     <string name="read_only_footer">Nur Anzeige · Europe/Berlin</string>
+    <string name="app_update">App-Update</string>
+    <string name="update_installed">Installierte Version: %1$s</string>
+    <string name="update_source">Updates von GitHub Releases. Download und Installation starten nur auf deinen Wunsch. Android bestätigt die Installation.</string>
+    <string name="update_check">Nach Updates suchen</string>
+    <string name="update_checking">Update wird gesucht …</string>
+    <string name="update_available">Version %1$s ist verfügbar.</string>
+    <string name="update_none">Keine neuere veröffentlichte Version verfügbar.</string>
+    <string name="update_download">Herunterladen</string>
+    <string name="update_downloading">Update wird heruntergeladen und geprüft …</string>
+    <string name="update_failed">Update konnte nicht geladen oder sicher geprüft werden. Bitte erneut versuchen.</string>
+    <string name="update_ready">Update geprüft und bereit. Die Installation erfolgt über Android. Nach Abbruch kannst du sie erneut starten.</string>
+    <string name="update_permission">Erlaube dieser App in den Android-Einstellungen die Installation von Apps. Kehre danach hierher zurück und tippe auf Installieren.</string>
+    <string name="update_allow_install">Installation erlauben</string>
+    <string name="update_install">Installieren</string>
+    <string name="update_download_again">Erneut herunterladen</string>
+    <string name="update_install_failed">Android-Installation konnte nicht geöffnet werden. Prüfe die Berechtigung oder lade das Update erneut, falls Android die Datei entfernt hat.</string>
 </resources>

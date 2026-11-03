@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
@@ -77,6 +78,17 @@ class MainActivity : ComponentActivity() {
                 initializer { CalendarViewModel(LocabooAvailabilitySource()) }
             })
             val state by calendar.state.collectAsStateWithLifecycle()
+            val updates: AppUpdateViewModel = viewModel(factory = viewModelFactory {
+                initializer { AppUpdateViewModel(AppUpdateRepository(applicationContext)) }
+            })
+            val updateState by updates.state.collectAsStateWithLifecycle()
+            var showUpdates by rememberSaveable { mutableStateOf(false) }
+            var canInstall by rememberSaveable { mutableStateOf(false) }
+            var installError by rememberSaveable { mutableStateOf(false) }
+            LifecycleResumeEffect(Unit) {
+                canInstall = packageManager.canRequestPackageInstalls()
+                onPauseOrDispose { }
+            }
             val lifecycle = LocalLifecycleOwner.current.lifecycle
             LaunchedEffect(calendar, lifecycle) {
                 lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -92,6 +104,7 @@ class MainActivity : ComponentActivity() {
             CalendarTheme {
                 CalendarScreen(state, calendar::showRange, calendar::refresh,
                     openDate = openDate, openRequest = openRequest,
+                    onAppUpdate = { showUpdates = true },
                     onOpenNotifications = {
                         monitoring = store.settings()
                         allowed = notificationsAllowed(this)
@@ -117,6 +130,29 @@ class MainActivity : ComponentActivity() {
                         startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
                     },
                     onDismiss = { showPreferences = false },
+                )
+                if (showUpdates) AppUpdateDialog(
+                    state = updateState,
+                    installedVersion = updates.installedVersion,
+                    canInstall = canInstall,
+                    installError = installError,
+                    onCheck = { installError = false; updates.check() },
+                    onDownload = { installError = false; updates.download() },
+                    onInstall = {
+                        installError = false
+                        try {
+                            if (!packageManager.canRequestPackageInstalls()) {
+                                startActivity(appInstallPermissionIntent(this@MainActivity))
+                            } else {
+                                val apk = checkNotNull(updateState.apk)
+                                check(apk.isFile)
+                                startActivity(appInstallIntent(this@MainActivity, apk))
+                            }
+                        } catch (_: Exception) {
+                            installError = true
+                        }
+                    },
+                    onDismiss = { showUpdates = false },
                 )
             }
         }

@@ -14,8 +14,22 @@ android {
         applicationId = "de.bewegungswelt.radar"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+    }
+
+    signingConfigs {
+        create("release") {
+            System.getenv("RADAR_KEYSTORE_PATH")?.let { storeFile = file(it) }
+            storePassword = System.getenv("RADAR_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("RADAR_KEY_ALIAS")
+            keyPassword = System.getenv("RADAR_KEY_PASSWORD")
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("release")
+        }
     }
 
     buildFeatures {
@@ -42,6 +56,16 @@ tasks.withType<Test>().configureEach {
     jvmArgs("--enable-native-access=ALL-UNNAMED")
 }
 
+// Never produce an unsigned APK that could accidentally be published as an update.
+tasks.matching { it.name == "validateSigningRelease" }.configureEach {
+    doFirst {
+        check(listOf("RADAR_KEYSTORE_PATH", "RADAR_KEYSTORE_PASSWORD", "RADAR_KEY_ALIAS", "RADAR_KEY_PASSWORD")
+            .all { !System.getenv(it).isNullOrBlank() }) {
+            "Release signing is not configured. See RELEASE.md."
+        }
+    }
+}
+
 dependencies {
     implementation(project(":core:availability"))
     implementation(project(":provider-locaboo"))
@@ -52,6 +76,9 @@ dependencies {
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.coroutines.android)
+    implementation(libs.androidx.core)
+    implementation(libs.okhttp)
+    implementation(libs.gson)
     implementation(libs.compose.material3)
     implementation(libs.compose.ui.tooling.preview)
     debugImplementation(libs.compose.ui.tooling)

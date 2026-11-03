@@ -4,5 +4,8 @@
 local.properties
 .idea/
 *.iml
+*.jks
+*.keystore
+*.p12
 .amp/portals/*
 .amp/in/
