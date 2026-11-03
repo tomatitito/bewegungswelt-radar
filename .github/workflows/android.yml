@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
+      - name: Test release decisions
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
       - uses: actions/setup-java@v6.1.0
         with:
           distribution: temurin

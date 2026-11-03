@@ -1,0 +1,114 @@
+name: Release APK
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-stable-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'tomatitito/bewegungswelt-radar'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test release decisions
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py' -v
+      - name: Check whether the Gradle version needs a release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/release.py
+      - uses: actions/setup-java@v6.1.0
+        if: steps.version.outputs.needed == 'true'
+        with:
+          distribution: temurin
+          java-version: '25.0.3+9'
+      - uses: android-actions/setup-android@v4.0.4
+        if: steps.version.outputs.needed == 'true'
+        with:
+          cmdline-tools-version: '16111833'
+          packages: 'platform-tools platforms;android-37.2 build-tools;37.0.0'
+      - uses: gradle/actions/setup-gradle@v6.4.1
+        if: steps.version.outputs.needed == 'true'
+        with:
+          cache-disabled: true
+      - name: Decode signing key
+        if: steps.version.outputs.needed == 'true'
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          RADAR_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          RADAR_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          RADAR_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          umask 077
+          for name in KEYSTORE_BASE64 RADAR_KEYSTORE_PASSWORD RADAR_KEY_ALIAS RADAR_KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "Required signing secret is missing: $name" >&2
+              exit 1
+            fi
+          done
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/radar-release.keystore"
+          test -s "$RUNNER_TEMP/radar-release.keystore"
+      - name: Check and build signed APK
+        if: steps.version.outputs.needed == 'true'
+        shell: bash
+        env:
+          RADAR_KEYSTORE_PATH: ${{ runner.temp }}/radar-release.keystore
+          RADAR_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          RADAR_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          RADAR_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon test lintDebug assembleDebug assembleRelease
+      - name: Verify signer and stage assets
+        if: steps.version.outputs.needed == 'true'
+        shell: bash
+        env:
+          RADAR_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          RADAR_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ASSET: ${{ steps.version.outputs.asset }}
+        run: |
+          set -euo pipefail
+          umask 077
+          apk=app/build/outputs/apk/release/app-release.apk
+          keytool -exportcert -keystore "$RUNNER_TEMP/radar-release.keystore" \
+            -storepass:env RADAR_KEYSTORE_PASSWORD -alias "$RADAR_KEY_ALIAS" \
+            -file "$RUNNER_TEMP/radar-release-cert.der" > /dev/null
+          expected=$(sha256sum "$RUNNER_TEMP/radar-release-cert.der" | cut -d ' ' -f 1)
+          # Build-tools 37 labels certificates by scheme (e.g. "V2 Signer").
+          # All reported signing certificates must equal the configured identity.
+          actual=$("$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$apk" \
+            | sed -n 's/^.*certificate SHA-256 digest: //p' | sort -u)
+          test -n "$actual"
+          test "$actual" = "$expected"
+          mkdir -p "$RUNNER_TEMP/radar-release-assets"
+          cp "$apk" "$RUNNER_TEMP/radar-release-assets/$ASSET"
+          (cd "$RUNNER_TEMP/radar-release-assets" && sha256sum "$ASSET" > "$ASSET.sha256")
+      - name: Publish stable release (never replace assets)
+        if: steps.version.outputs.needed == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          python3 .github/scripts/release.py --publish
+      - name: Remove signing material and staged assets
+        if: always() && steps.version.outputs.needed == 'true'
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/radar-release.keystore" "$RUNNER_TEMP/radar-release-cert.der"
+          rm -rf "$RUNNER_TEMP/radar-release-assets"

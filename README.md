@@ -81,6 +81,19 @@ No secrets, environment templates, accounts, or databases are required. The app
 declares Android's normal `INTERNET` permission; it has no runtime permission
 prompt for read-only calendar access.
 
+**App-Update** opens a manual update check against this repository's stable
+GitHub Releases. A newer APK downloads only after confirmation and must match
+the app's package, advertised version, and installed signing certificate.
+Android's package installer asks for installation confirmation. On first use,
+allow this app to install apps in Android Settings, then return and tap
+**Installieren**. There are no automatic checks or silent installations.
+Downloads use a private temporary cache; if Android removes it or the process
+is killed, check/download again. Closing the dialog does not cancel an active
+download. Network/validation failures offer retry, never an unchecked install.
+Release signing and publishing setup is documented in [RELEASE.md](RELEASE.md).
+Existing debug installations need a one-time reinstall to switch to the
+permanent release signing key; differently signed APKs cannot update each other.
+
 ```sh
 ./gradlew --no-daemon test lintDebug assembleDebug
 ```
