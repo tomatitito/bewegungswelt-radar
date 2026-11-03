@@ -85,6 +85,7 @@ private val Background = Color(0xFF1D1A18)
 private val Panel = Color(0xFF252422)
 private val Selection = Color(0xFFB5B3AA)
 private val Bookable = Color(0xFF28643C)
+private val NotBookable = Color(0xFF41403D)
 private val Outline = Color(0xFF55534F)
 private val SecondaryText = Color(0xFFBDBBB6)
 private val CalendarZone = ZoneId.of("Europe/Berlin")
@@ -377,7 +378,7 @@ private fun DayCell(date: LocalDate, selected: Boolean, bookable: Boolean, confi
     val shape = RoundedCornerShape(8.dp)
     Column(
         modifier.padding(2.dp).clip(shape)
-            .background(if (selected) Selection else if (bookable) Bookable else Panel)
+            .background(if (selected) Selection else if (bookable) Bookable else if (confirmed) NotBookable else Panel)
             .border(if (selected) 2.dp else 1.dp, if (bookable) Bookable else Outline, shape)
             .selectable(selected = selected, role = Role.Button, onClick = onClick)
             .semantics(mergeDescendants = true) { contentDescription = description }
@@ -385,7 +386,7 @@ private fun DayCell(date: LocalDate, selected: Boolean, bookable: Boolean, confi
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        val color = if (selected) Background else Color.White
+        val color = if (selected) Background else if (confirmed && !bookable) SecondaryText else Color.White
         if (week) Text(date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.GERMAN).removeSuffix("."), color = color, style = MaterialTheme.typography.labelMedium)
         Text(date.dayOfMonth.toString(), color = color, fontWeight = if (selected || bookable) FontWeight.Bold else FontWeight.Normal)
     }
