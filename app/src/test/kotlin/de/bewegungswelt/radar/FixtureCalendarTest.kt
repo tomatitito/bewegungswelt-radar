@@ -125,6 +125,45 @@ class FixtureCalendarTest {
     }
 
     @Test
+    fun `only dates beyond the confirmed booking horizon are not yet released`() {
+        val today = LocalDate.of(2027, 4, 2)
+        // April 3 is inclusive; the boundary is April 4 midnight in Berlin, not UTC.
+        val horizon = Instant.parse("2027-04-03T22:00:00Z")
+        fun stateFor(range: CalendarRange): CalendarUiState {
+            val base = fixtureState(range) { date ->
+                demoSlots(date).map { it.copy(status = if (date == today) SlotStatus.BOOKABLE else SlotStatus.BOOKED) }
+            }
+            return base.copy(snapshot = base.snapshot!!.copy(bookingHorizonEndExclusive = horizon))
+        }
+        var state by mutableStateOf(stateFor(CalendarRange(today.minusDays(4), today.plusDays(3))))
+        compose.setContent {
+            CalendarTheme {
+                CalendarScreen(state, { state = stateFor(it) }, {}, today)
+            }
+        }
+        val lastReleased = "Samstag, 3. April 2027, Kein buchbarer Start"
+        val firstUnreleased = "Sonntag, 4. April 2027, Noch nicht zur Buchung freigegeben"
+        compose.onNodeWithContentDescription(lastReleased).assertExists()
+        compose.onNodeWithContentDescription(firstUnreleased).assertExists()
+        compose.onNodeWithText("Monat").performClick()
+        compose.onNodeWithContentDescription(lastReleased).assertExists()
+        compose.onNodeWithContentDescription(firstUnreleased).performClick().assertIsSelected()
+        compose.onNodeWithText("Woche").assertIsSelected()
+        compose.runOnIdle { state = state.copy(loading = true) }
+        compose.onNodeWithContentDescription(firstUnreleased).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Sonntag, 4. April 2027, Verfügbarkeit unbestätigt").assertExists()
+        compose.runOnIdle {
+            state = state.copy(loading = false, diagnostic = SourceDiagnostic("Abruf fehlgeschlagen."))
+        }
+        compose.onNodeWithContentDescription(firstUnreleased).assertDoesNotExist()
+        compose.runOnIdle {
+            state = state.copy(diagnostic = null, snapshot = state.snapshot!!.copy(bookingHorizonEndExclusive = null))
+        }
+        compose.onNodeWithContentDescription(firstUnreleased).assertDoesNotExist()
+        compose.onNodeWithContentDescription("Sonntag, 4. April 2027, Kein buchbarer Start").assertExists()
+    }
+
+    @Test
     fun `refresh and failure never expose stale bookable starts`() {
         val range = CalendarRange(LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 9))
         var state by mutableStateOf(fixtureState(range))

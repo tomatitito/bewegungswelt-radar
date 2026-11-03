@@ -28,6 +28,7 @@
     <string name="status">STATUS</string>
     <string name="day_bookable">Mindestens ein buchbarer Start</string>
     <string name="day_no_bookable">Kein buchbarer Start</string>
+    <string name="day_unreleased">Noch nicht zur Buchung freigegeben</string>
     <string name="no_slots">Keine Öffnungszeiten an diesem Tag</string>
     <string name="slot_description">%1$s, %2$s</string>
     <string name="slot_details">Buchungsstart</string>

@@ -6,9 +6,10 @@ for remaining hardening and device validation. There are no booking or payment a
 
 The dark calendar opens on the current week in `Europe/Berlin`. Switch to
 **Monat** to browse dates; tapping a date opens its week with that day selected.
-Forest green means at least one bookable slot; muted charcoal gray means a
-confirmed day with no bookable starts, while warm light gray marks selection.
-Unconfirmed days retain the neutral dark background. All dates remain tappable.
+Forest green means at least one bookable slot; muted charcoal gray means a day
+beyond the confirmed booking horizon, not yet released for public booking.
+Released days with no bookable starts and unconfirmed days retain the neutral
+dark background; warm light gray marks selection. All dates remain tappable.
 The timetable shows possible booking starts on a 30-minute grid inside opening
 windows, not 30-minute bookings. `Buchbar` requires at least the published minimum
 duration (currently 60 minutes) to remain free; `Nicht buchbar` also covers past
