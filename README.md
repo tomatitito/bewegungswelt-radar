@@ -64,7 +64,7 @@ notification taps and DND behavior; no Android device is connected in the orb.
 
 ## Build and check
 
-- Temurin JDK **25.0.5+8 LTS** (build and test runtime)
+- Temurin JDK **25.0.3+9 LTS** (build and test runtime)
 - Android SDK platform **37.2**, build tools **37.0.0**, and platform-tools
 - Gradle **9.8.2** via the checked-in wrapper (no global Gradle required)
 - Kotlin **2.4.21**, Android Gradle Plugin **9.5.0**; dependencies are pinned in
@@ -121,7 +121,7 @@ Compose rule use JUnit 4.
 ## Amp orbs
 
 `.agents/setup` installs missing Debian packages, checksum-verified Temurin JDK
-25.0.5+8 and Android command-line tools **23.0**, accepts Android SDK licenses,
+25.0.3+9 and Android command-line tools **23.0**, accepts Android SDK licenses,
 installs SDK 37.2, and runs the build/check command above to populate Gradle
 caches. The JDK archive is pinned for Linux x64, the architecture of this project's
 orbs. Running setup requires network access and passwordless sudo when system

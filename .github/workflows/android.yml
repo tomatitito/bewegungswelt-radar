@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-java@v6.1.0
         with:
           distribution: temurin
-          java-version: '25.0.5+8'
+          java-version: '25.0.3+9'
       - uses: android-actions/setup-android@v4.0.4
         with:
           cmdline-tools-version: '16111833'
