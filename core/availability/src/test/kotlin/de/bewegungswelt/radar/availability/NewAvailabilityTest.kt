@@ -95,6 +95,8 @@ class NewAvailabilityTest {
     fun `only verified horizon expansion alerts for previously unobserved starts`() {
         val observations = listOf("09:00", "09:30", "10:00", "10:30", "11:00").map { slot(it, SlotStatus.BOOKABLE) }
         val expanded = compareAvailability(observations, emptyMap(), at("10:00"), at("11:00"))
+        assertEquals(listOf(listOf(at("10:00"), at("10:30"))), expanded.newlyReleasedGroups)
+        assertTrue(expanded.reopenedGroups.isEmpty())
         assertEquals(listOf(at("10:00"), at("10:30")), expanded.newlyAvailableStarts)
         assertTrue(compareAvailability(observations, emptyMap(), null, at("11:00")).newlyAvailableStarts.isEmpty())
         assertTrue(compareAvailability(observations, emptyMap(), at("10:00"), null).newlyAvailableStarts.isEmpty())
@@ -120,7 +122,9 @@ class NewAvailabilityTest {
             slot("10:00", SlotStatus.BOOKABLE), slot("09:00", SlotStatus.BOOKABLE), slot("10:30", SlotStatus.CLOSED))
         val prior = observations.associate { it.window.start to SlotStatus.CLOSED }.toMutableMap()
         prior[at("10:00")] = SlotStatus.BOOKABLE
-        assertEquals(listOf(listOf(at("09:00"), at("09:30")), listOf(at("11:00"))),
-            compareAvailability(observations, prior).newlyAvailableGroups)
+        val comparison = compareAvailability(observations, prior)
+        assertTrue(comparison.newlyReleasedGroups.isEmpty())
+        assertEquals(listOf(listOf(at("09:00"), at("09:30")), listOf(at("11:00"))), comparison.reopenedGroups)
+        assertEquals(comparison.reopenedGroups, comparison.newlyAvailableGroups)
     }
 }

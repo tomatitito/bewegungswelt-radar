@@ -23,10 +23,15 @@ fun calculateNotificationAvailability(
 data class AvailabilityComparison(
     /** Persist these confirmed statuses keyed by start Instant; UNKNOWN is never stored. */
     val confirmedStatuses: Map<Instant, SlotStatus>,
-    /** Adjacent newly eligible half-hour grid STARTS, not bookable duration intervals. */
-    val newlyAvailableGroups: List<List<Instant>>,
+    /** Starts first observed through a verified booking-horizon expansion. */
+    val newlyReleasedGroups: List<List<Instant>>,
+    /** Starts that changed from a confirmed unavailable state to bookable. */
+    val reopenedGroups: List<List<Instant>>,
 ) {
-    val newlyAvailableStarts: List<Instant> get() = newlyAvailableGroups.flatten()
+    val newlyAvailableStarts: List<Instant>
+        get() = (newlyReleasedGroups.flatten() + reopenedGroups.flatten()).sorted()
+    val newlyAvailableGroups: List<List<Instant>>
+        get() = groupAdjacent(newlyAvailableStarts)
 }
 
 /**
@@ -53,7 +58,8 @@ fun compareAvailability(
         "Each start must have a single observation"
     }
     val confirmed = previousConfirmedStatuses.toMutableMap()
-    val newlyAvailable = mutableListOf<Slot>()
+    val newlyReleased = mutableListOf<Instant>()
+    val reopened = mutableListOf<Instant>()
     for (slot in observations.sortedBy { it.window.start }) {
         if (slot.status == SlotStatus.UNKNOWN) continue
         val start = slot.window.start
@@ -61,17 +67,24 @@ fun compareAvailability(
         val released = previous == null && previousBookingHorizonEndExclusive != null &&
             bookingHorizonEndExclusive != null && start >= previousBookingHorizonEndExclusive &&
             start < bookingHorizonEndExclusive
-        if (slot.status == SlotStatus.BOOKABLE &&
-            (previous == SlotStatus.BOOKED || previous == SlotStatus.CLOSED || released)
-        ) newlyAvailable += slot
+        if (slot.status == SlotStatus.BOOKABLE) {
+            if (released) newlyReleased += start
+            else if (previous == SlotStatus.BOOKED || previous == SlotStatus.CLOSED) reopened += start
+        }
         confirmed[start] = slot.status
     }
+    return AvailabilityComparison(
+        confirmed.toMap(),
+        groupAdjacent(newlyReleased),
+        groupAdjacent(reopened),
+    )
+}
+
+private fun groupAdjacent(starts: List<Instant>): List<List<Instant>> {
     val groups = mutableListOf<MutableList<Instant>>()
-    var previousNew: Slot? = null
-    for (slot in newlyAvailable) {
-        if (previousNew?.window?.endExclusive != slot.window.start) groups += mutableListOf<Instant>()
-        groups.last() += slot.window.start
-        previousNew = slot
+    for (start in starts.sorted()) {
+        if (groups.lastOrNull()?.lastOrNull()?.plusSeconds(30 * 60L) != start) groups.add(mutableListOf())
+        groups.last() += start
     }
-    return AvailabilityComparison(confirmed.toMap(), groups.map { it.toList() })
+    return groups.map { it.toList() }
 }

@@ -12,8 +12,9 @@ Released days with no bookable starts and unconfirmed days retain the neutral
 dark background; warm light gray marks selection. All dates remain tappable.
 The timetable shows possible booking starts on a 30-minute grid inside opening
 windows, not 30-minute bookings. `Buchbar` requires at least the published minimum
-duration (currently 60 minutes) to remain free; `Nicht buchbar` also covers past
-starts, restrictions, and insufficient remaining time, not just closed doors.
+duration (currently 60 minutes) to remain free; `Kein Buchungsstart` covers past
+starts, restrictions, and insufficient remaining time. For example, `10:00`
+can be bookable for 10:00–11:00 while `10:30` is not a valid 60-minute start.
 Tap a row for read-only details, and recheck rules and availability in Locaboo
 before booking. Server-side booking acceptance is not guaranteed by this display.
 
@@ -45,8 +46,10 @@ Denial leaves the calendar usable. Disable monitoring from the same dialog.
 
 The first complete scan is silent. Cancellations, lifted restrictions, and newly
 released dates can then alert; unchanged availability does not repeat across
-restarts. Duration/booking-rule changes or re-enabling create a silent baseline;
-cadence changes retain it. Adjacent new booking **starts** are grouped per date.
+restarts. Notifications distinguish starts first observed through a verified date
+release from starts that became free again. Duration/booking-rule changes or
+re-enabling create a silent baseline; cadence changes retain it. Adjacent new
+booking **starts** are grouped per date.
 Multi-date releases use one audible Android group summary and up to seven date
 cards; all dates remain accessible in the calendar. Tapping opens a date and
 refreshes it. An alert neither reserves nor guarantees a slot.

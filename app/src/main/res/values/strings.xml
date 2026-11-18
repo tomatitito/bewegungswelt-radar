@@ -10,7 +10,7 @@
     <string name="availability_unconfirmed">Verfügbarkeit unbestätigt</string>
     <string name="bookable">Buchbar</string>
     <string name="booked">Gebucht</string>
-    <string name="closed">Nicht buchbar</string>
+    <string name="closed">Kein Buchungsstart</string>
     <string name="unknown">Unbekannt</string>
     <string name="week">Woche</string>
     <string name="month">Monat</string>
@@ -19,10 +19,10 @@
     <string name="next_month">Nächster Monat</string>
     <string name="previous_week">Vorherige Woche</string>
     <string name="next_week">Nächste Woche</string>
-    <string name="slot_duration">Startzeiten im 30-Minuten-Raster</string>
+    <string name="slot_duration">Mögliche Buchungsstarts im 30-Minuten-Raster</string>
     <plurals name="minimum_duration">
-        <item quantity="one">Mindestens %1$d Minute Buchungsdauer</item>
-        <item quantity="other">Mindestens %1$d Minuten Buchungsdauer</item>
+        <item quantity="one">„Buchbar“: ab Start mindestens %1$d Minute durchgehend frei</item>
+        <item quantity="other">„Buchbar“: ab Start mindestens %1$d Minuten durchgehend frei</item>
     </plurals>
     <string name="time">START</string>
     <string name="status">STATUS</string>

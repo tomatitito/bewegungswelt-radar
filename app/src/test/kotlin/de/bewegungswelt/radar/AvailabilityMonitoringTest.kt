@@ -84,7 +84,8 @@ class AvailabilityMonitoringTest {
         val notifications = manager.activeNotifications
         assertEquals(1, notifications.size)
         assertEquals(today.plusDays(130).toString(), notifications.single().tag)
-        assertTrue(notifications.single().notification.extras.getString(Notification.EXTRA_TEXT)!!.contains("10:00–11:00"))
+        assertTrue(notifications.single().notification.extras.getString(Notification.EXTRA_TEXT)!!.contains("Neu freigegebene Starts: 10:00–11:00"))
+        assertTrue(notifications.single().notification.extras.getString(Notification.EXTRA_TITLE)!!.contains("neu freigegebene Zeiten"))
         val intent = shadowOf(notifications.single().notification.contentIntent).savedIntent
         assertEquals(today.plusDays(130).toString(), intent.getStringExtra("availabilityDate"))
         manager.cancelAll()
@@ -120,7 +121,7 @@ class AvailabilityMonitoringTest {
         source.booking = false
         monitorAvailability(context, source, now)
         assertEquals(1, manager.activeNotifications.size)
-        assertTrue(manager.activeNotifications.single().notification.extras.getString(Notification.EXTRA_TEXT)!!.contains("09:00–09:30"))
+        assertTrue(manager.activeNotifications.single().notification.extras.getString(Notification.EXTRA_TEXT)!!.contains("Wieder freie Starts: 09:00–09:30"))
         manager.cancelAll()
         monitorAvailability(context, source, now)
         assertTrue(manager.activeNotifications.isEmpty())
@@ -168,7 +169,7 @@ class AvailabilityMonitoringTest {
         monitorAvailability(context, source, now)
         val alert = manager.activeNotifications.single()
         assertEquals(today.toString(), alert.tag)
-        assertTrue(alert.notification.extras.getString(Notification.EXTRA_TEXT)!!.contains("Neue Starts: 23:00 · mindestens 120 Min."))
+        assertTrue(alert.notification.extras.getString(Notification.EXTRA_TEXT)!!.contains("Wieder freie Starts: 23:00 · mindestens 120 Min."))
     }
 
     @Test fun `large releases have one audible summary and bounded date cards`() = runBlocking {

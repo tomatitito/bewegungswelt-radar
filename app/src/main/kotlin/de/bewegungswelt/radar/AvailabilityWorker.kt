@@ -122,26 +122,49 @@ internal suspend fun monitorAvailability(context: Context, source: AvailabilityS
             .putString("checkedAt", now.toString()).putBoolean("error", false).commit())
         // Persist before posting: retries/restarts cannot re-alert unchanged availability.
         // A process death in this small window may lose an alert, preferable to duplicate floods.
-        if (notificationsAllowed(context)) postAvailability(context, comparison.newlyAvailableGroups,
-            maxOf(settings.minimumMinutes, rules.minimumDuration.toMinutes().toInt()))
+        if (notificationsAllowed(context)) postAvailability(
+            context,
+            comparison.newlyReleasedGroups,
+            comparison.reopenedGroups,
+            maxOf(settings.minimumMinutes, rules.minimumDuration.toMinutes().toInt()),
+        )
     }
 }
 
-internal fun postAvailability(context: Context, groups: List<List<Instant>>, minimumMinutes: Int) {
-    val byDate = groups.flatMap { it }.groupBy { it.atZone(MonitoringZone).toLocalDate() }
+internal fun postAvailability(
+    context: Context,
+    newlyReleasedGroups: List<List<Instant>>,
+    reopenedGroups: List<List<Instant>>,
+    minimumMinutes: Int,
+) {
+    val allStarts = newlyReleasedGroups.flatten() + reopenedGroups.flatten()
+    val byDate = allStarts.groupBy { it.atZone(MonitoringZone).toLocalDate() }
     val time = DateTimeFormatter.ofPattern("HH:mm").withZone(MonitoringZone)
     val manager = notificationManager(context)
+    fun ranges(groups: List<List<Instant>>, date: LocalDate) = groups
+        .map { group -> group.filter { it.atZone(MonitoringZone).toLocalDate() == date } }
+        .filter { it.isNotEmpty() }
+        .joinToString("; ") { group ->
+            if (group.size == 1) time.format(group.first())
+            else "${time.format(group.first())}–${time.format(group.last())}"
+        }
     // Large releases get one audible summary and at most seven date cards, not hundreds of alerts.
-    byDate.keys.take(7).forEach { date ->
-        val ranges = groups.map { group -> group.filter { it.atZone(MonitoringZone).toLocalDate() == date } }
-            .filter { it.isNotEmpty() }.joinToString("; ") { group ->
-                if (group.size == 1) time.format(group.first())
-                else "${time.format(group.first())}–${time.format(group.last())}"
-            }
-        val text = "Neue Starts: $ranges · mindestens $minimumMinutes Min. frei. Bitte erneut prüfen."
+    byDate.keys.sorted().take(7).forEach { date ->
+        val released = ranges(newlyReleasedGroups, date)
+        val reopened = ranges(reopenedGroups, date)
+        val changes = buildList {
+            if (released.isNotEmpty()) add("Neu freigegebene Starts: $released")
+            if (reopened.isNotEmpty()) add("Wieder freie Starts: $reopened")
+        }.joinToString(" · ")
+        val text = "$changes · mindestens $minimumMinutes Min. frei. Bitte erneut prüfen."
+        val title = when {
+            released.isNotEmpty() && reopened.isEmpty() -> "neu freigegebene Zeiten"
+            released.isEmpty() -> "wieder freie Zeiten"
+            else -> "neue freie Zeiten"
+        }
         val notification = Notification.Builder(context, AvailabilityChannel)
             .setSmallIcon(R.drawable.ic_availability)
-            .setContentTitle("${date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))}: neue freie Zeiten")
+            .setContentTitle("${date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))}: $title")
             .setContentText(text)
             .setStyle(Notification.BigTextStyle().bigText(text))
             .setContentIntent(availabilityIntent(context, date))
@@ -158,7 +181,7 @@ internal fun postAvailability(context: Context, groups: List<List<Instant>>, min
             .setContentTitle("Neue freie Zeiten an ${byDate.size} Tagen")
             .setContentText(if (byDate.size > 7) "Die ersten 7 Tage werden einzeln angezeigt. Weitere Termine im Kalender."
                 else "Öffnen und aktuelle Verfügbarkeit prüfen")
-            .setContentIntent(availabilityIntent(context, byDate.keys.first()))
+            .setContentIntent(availabilityIntent(context, byDate.keys.min()))
             .setGroup("availability-dates").setGroupSummary(true)
             .setAutoCancel(true).build())
     }

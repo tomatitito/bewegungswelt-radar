@@ -63,8 +63,8 @@ class FixtureCalendarTest {
         compose.onNodeWithText("Stand 01.11.2026 11:00 · Europe/Berlin").assertIsDisplayed()
         compose.onNodeWithText("Montag, 2. November 2026").assertIsDisplayed()
         compose.onNodeWithText("Woche").assertIsSelected()
-        compose.onNodeWithText("Mindestens 60 Minuten Buchungsdauer").assertIsDisplayed()
-        listOf("Buchbar", "Gebucht", "Nicht buchbar", "Unbekannt").forEach { status ->
+        compose.onNodeWithText("„Buchbar“: ab Start mindestens 60 Minuten durchgehend frei").assertIsDisplayed()
+        listOf("Buchbar", "Gebucht", "Kein Buchungsstart", "Unbekannt").forEach { status ->
             compose.onNodeWithText(status).performScrollTo().assertIsDisplayed()
         }
         compose.onNodeWithText("09:00").assertExists()
