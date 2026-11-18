@@ -1,12 +1,15 @@
 package de.bewegungswelt.radar
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,6 +18,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.Lifecycle
@@ -32,6 +36,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var openDate by mutableStateOf<LocalDate?>(null)
@@ -57,6 +62,10 @@ class MainActivity : ComponentActivity() {
         scheduleMonitoring(this, MonitoringStore(this).settings(), ExistingPeriodicWorkPolicy.KEEP)
         setContent {
             val store = remember { MonitoringStore(this) }
+            val queryStore = remember { QueryDiagnosticsStore(applicationContext) }
+            val queryEntries by queryStore.entries.collectAsStateWithLifecycle()
+            val scope = rememberCoroutineScope()
+            var showDiagnostics by rememberSaveable { mutableStateOf(false) }
             var monitoring by remember { mutableStateOf(store.settings()) }
             var allowed by remember { mutableStateOf(notificationsAllowed(this)) }
             var showPreferences by rememberSaveable { mutableStateOf(false) }
@@ -75,7 +84,7 @@ class MainActivity : ComponentActivity() {
                 pendingMinimum = 0
             }
             val calendar: CalendarViewModel = viewModel(factory = viewModelFactory {
-                initializer { CalendarViewModel(LocabooAvailabilitySource()) }
+                initializer { CalendarViewModel(LocabooAvailabilitySource(), diagnostics = queryStore) }
             })
             val state by calendar.state.collectAsStateWithLifecycle()
             val updates: AppUpdateViewModel = viewModel(factory = viewModelFactory {
@@ -101,16 +110,26 @@ class MainActivity : ComponentActivity() {
                 }
             }
             LaunchedEffect(openRequest) { calendar.refresh() }
+            BackHandler(enabled = showDiagnostics) { showDiagnostics = false }
             CalendarTheme {
-                CalendarScreen(state, calendar::showRange, calendar::refresh,
+                if (showDiagnostics) DiagnosticsScreen(
+                    entries = queryEntries,
+                    onBack = { showDiagnostics = false },
+                    onCopy = { text ->
+                        getSystemService(ClipboardManager::class.java)
+                            .setPrimaryClip(ClipData.newPlainText("Bewegungswelt Radar Diagnose", text))
+                    },
+                    onClear = { scope.launch { queryStore.clear() } },
+                ) else CalendarScreen(state, calendar::showRange, calendar::refresh,
                     openDate = openDate, openRequest = openRequest,
                     onAppUpdate = { showUpdates = true },
+                    onDiagnostics = { showDiagnostics = true },
                     onOpenNotifications = {
                         monitoring = store.settings()
                         allowed = notificationsAllowed(this)
                         showPreferences = true
                     })
-                if (showPreferences) MonitoringPreferences(
+                if (!showDiagnostics && showPreferences) MonitoringPreferences(
                     monitoring, allowed,
                     store.preferences.getString("checkedAt", null)?.let {
                         DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(ZoneId.of("Europe/Berlin"))
@@ -131,7 +150,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onDismiss = { showPreferences = false },
                 )
-                if (showUpdates) AppUpdateDialog(
+                if (!showDiagnostics && showUpdates) AppUpdateDialog(
                     state = updateState,
                     installedVersion = updates.installedVersion,
                     canInstall = canInstall,

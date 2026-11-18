@@ -13,7 +13,10 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
@@ -36,6 +39,7 @@ class AvailabilityMonitoringTest {
 
     @Before fun reset() {
         store.preferences.edit().clear().commit()
+        context.getSharedPreferences(QueryDiagnosticsStore.PreferencesName, Context.MODE_PRIVATE).edit().clear().commit()
         manager.cancelAll()
         ensureAvailabilityChannel(context)
         shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
@@ -170,6 +174,45 @@ class AvailabilityMonitoringTest {
         val alert = manager.activeNotifications.single()
         assertEquals(today.toString(), alert.tag)
         assertTrue(alert.notification.extras.getString(Notification.EXTRA_TEXT)!!.contains("Wieder freie Starts: 23:00 · mindestens 120 Min."))
+    }
+
+    @Test fun `complete multi-batch scan records one aggregate diagnostic and disabled monitoring records none`() = runBlocking {
+        val entries = mutableListOf<QueryLogEntry>()
+        val recorder = QueryDiagnosticsRecorder { entries += it }
+        val source = Source().apply { horizonDate = today.plusDays(130) }
+        monitorAvailability(context, source, now, recorder)
+        assertEquals(1, entries.size)
+        assertEquals(QueryOutcome.SUCCESS, entries.single().outcome)
+        assertEquals(4, entries.single().batchCount)
+        assertEquals(CalendarRange(today, today.plusDays(130)), entries.single().range)
+        assertTrue(entries.single().bookableStarts!! > 0)
+        assertTrue(entries.single().bookedHalfHours!! > 0)
+        store.save(store.settings().copy(enabled = false))
+        monitorAvailability(context, source, now, recorder)
+        assertEquals(1, entries.size)
+    }
+
+    @Test fun `failed scan records completed batches without advancing history and timeout is distinct`() = runBlocking {
+        val entries = mutableListOf<QueryLogEntry>()
+        val recorder = QueryDiagnosticsRecorder { entries += it }
+        val source = Source().apply { horizonDate = today.plusDays(70) }
+        monitorAvailability(context, source, now, recorder)
+        val history = store.preferences.getString("history", null)
+        source.failAfterDiscovery = true
+        try { monitorAvailability(context, source, now, recorder); fail("Expected failure") } catch (_: IllegalStateException) { }
+        assertEquals(history, store.preferences.getString("history", null))
+        assertEquals(QueryOutcome.FAILURE, entries.last().outcome)
+        assertEquals(1, entries.last().batchCount)
+
+        val waiting = object : AvailabilitySource {
+            override val descriptor = SourceDescriptor("waiting", "waiting")
+            override suspend fun loadCalendar(range: CalendarRange): CalendarSnapshot = CompletableDeferred<CalendarSnapshot>().await()
+        }
+        try {
+            withTimeout(1) { monitorAvailability(context, waiting, now, recorder) }
+            fail("Expected timeout")
+        } catch (_: TimeoutCancellationException) { }
+        assertEquals(QueryFailure.TIMEOUT, entries.last().failure)
     }
 
     @Test fun `large releases have one audible summary and bounded date cards`() = runBlocking {

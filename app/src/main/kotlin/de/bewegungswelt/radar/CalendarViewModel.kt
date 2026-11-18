@@ -13,6 +13,7 @@ import java.time.Clock
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -32,6 +33,7 @@ internal data class CalendarUiState(
 internal class CalendarViewModel(
     private val source: AvailabilitySource,
     private val clock: Clock = Clock.systemUTC(),
+    private val diagnostics: QueryDiagnosticsRecorder = QueryDiagnosticsRecorder.None,
 ) : ViewModel() {
     private val mutableState = MutableStateFlow(CalendarUiState())
     val state = mutableState.asStateFlow()
@@ -54,15 +56,31 @@ internal class CalendarViewModel(
         val previous = state.value.snapshot?.takeIf { state.value.range == range }
         mutableState.value = CalendarUiState(range = range, snapshot = previous)
         request = viewModelScope.launch {
+            val startedAt = clock.instant()
             try {
                 val snapshot = source.loadCalendar(range)
                 val slots = slots(range, snapshot)
+                val finishedAt = clock.instant()
+                val aggregate = queryAggregate(snapshot, finishedAt)
+                record(QueryLogEntry(
+                    startedAt, finishedAt, QueryTrigger.CALENDAR, range, 1, QueryOutcome.SUCCESS,
+                    bookableStarts = aggregate.bookableStarts,
+                    bookedHalfHours = aggregate.bookedHalfHours,
+                    bookingHorizonEndExclusive = aggregate.bookingHorizonEndExclusive,
+                ))
                 if (generation == currentGeneration) {
                     mutableState.value = CalendarUiState(range, snapshot, slots, loading = false)
                 }
             } catch (cancelled: CancellationException) {
+                val finishedAt = clock.instant()
+                record(QueryLogEntry(startedAt, finishedAt, QueryTrigger.CALENDAR, range, 1, QueryOutcome.CANCELLED))
                 throw cancelled
             } catch (failure: Exception) {
+                val finishedAt = clock.instant()
+                record(QueryLogEntry(
+                    startedAt, finishedAt, QueryTrigger.CALENDAR, range, 1, QueryOutcome.FAILURE,
+                    failure = queryFailure(failure),
+                ))
                 if (generation == currentGeneration) {
                     mutableState.value = CalendarUiState(
                         range = range,
@@ -74,6 +92,10 @@ internal class CalendarViewModel(
                 }
             }
         }
+    }
+
+    private suspend fun record(entry: QueryLogEntry) {
+        withContext(NonCancellable) { runCatching { diagnostics.record(entry) } }
     }
 
     /** Re-evaluate past starts on the foreground clock without extra upstream requests. */

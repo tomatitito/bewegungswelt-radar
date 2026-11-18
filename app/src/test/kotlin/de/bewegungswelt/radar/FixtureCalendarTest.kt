@@ -22,6 +22,7 @@ import de.bewegungswelt.radar.model.Slot
 import de.bewegungswelt.radar.model.SlotStatus
 import de.bewegungswelt.radar.model.SourceDiagnostic
 import de.bewegungswelt.radar.model.TimeWindow
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,6 +55,35 @@ class FixtureCalendarTest {
             CalendarTheme {
                 CalendarScreen(fixtureState(range, slotsForDay), { range = it }, {}, today)
             }
+        }
+    }
+
+    @Test
+    fun `overflow menu exposes secondary actions with accessible button`() {
+        val today = LocalDate.of(2026, 11, 2)
+        var notifications = 0
+        var updates = 0
+        var diagnostics = 0
+        compose.setContent {
+            CalendarTheme {
+                CalendarScreen(
+                    fixtureState(CalendarRange(today, today.plusDays(7))), {}, {}, today,
+                    onOpenNotifications = { notifications++ },
+                    onAppUpdate = { updates++ },
+                    onDiagnostics = { diagnostics++ },
+                )
+            }
+        }
+        compose.onNodeWithContentDescription("Weitere Optionen").performClick()
+        compose.onNodeWithText("Neue freie Zeiten").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("Weitere Optionen").performClick()
+        compose.onNodeWithText("App-Update").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("Weitere Optionen").performClick()
+        compose.onNodeWithText("Diagnose").assertIsDisplayed().performClick()
+        compose.runOnIdle {
+            assertEquals(1, notifications)
+            assertEquals(1, updates)
+            assertEquals(1, diagnostics)
         }
     }
 

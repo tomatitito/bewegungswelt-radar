@@ -104,6 +104,43 @@ class CalendarViewModelTest {
     }
 
     @Test
+    fun `query diagnostics record aggregate success sanitized failure and obsolete cancellation`() = runTest(dispatcher) {
+        val entries = mutableListOf<QueryLogEntry>()
+        val recorder = QueryDiagnosticsRecorder { entries += it }
+        var current = now
+        val clock = object : Clock() {
+            override fun getZone(): ZoneId = range.zone
+            override fun withZone(zone: ZoneId): Clock = Clock.fixed(current, zone)
+            override fun instant(): Instant = current
+        }
+        var response = CompletableDeferred<CalendarSnapshot>()
+        val model = CalendarViewModel(source { response.await() }, clock, recorder)
+        model.showRange(range)
+        runCurrent()
+        current = now.plusSeconds(3)
+        response.complete(snapshot(range))
+        model.state.first { it.confirmed }
+        assertEquals(QueryOutcome.SUCCESS, entries.single().outcome)
+        assertEquals(2, entries.single().bookableStarts)
+        assertEquals(1, entries.single().bookedHalfHours)
+        assertEquals(3_000, entries.single().elapsed.toMillis())
+
+        response = CompletableDeferred()
+        model.refresh()
+        runCurrent()
+        response.completeExceptionally(AvailabilityLoadException(SourceDiagnostic("Locaboo ist derzeit nicht erreichbar. Bitte erneut versuchen.")))
+        model.state.first { !it.loading }
+        assertEquals(QueryFailure.NETWORK, entries.last().failure)
+
+        response = CompletableDeferred()
+        model.refresh()
+        runCurrent()
+        model.showRange(CalendarRange(range.start.plusWeeks(1), range.endExclusive.plusWeeks(1)))
+        runCurrent()
+        assertTrue(entries.any { it.outcome == QueryOutcome.CANCELLED })
+    }
+
+    @Test
     fun `foreground time updates expire starts without another fetch`() = runTest(dispatcher) {
         var currentTime = now
         val clock = object : Clock() {

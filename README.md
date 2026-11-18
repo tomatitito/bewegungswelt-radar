@@ -87,6 +87,17 @@ No secrets, environment templates, accounts, or databases are required. The app
 declares Android's normal `INTERNET` permission; it has no runtime permission
 prompt for read-only calendar access.
 
+Calendar header's three-dot menu contains **Neue freie Zeiten**, **App-Update**,
+and **Diagnose**. Diagnose keeps up to 200 Locaboo query observations for 30 days
+in private app storage: start/end timestamps, duration, foreground/background
+trigger, requested date range, batch count, sanitized outcome, aggregate bookable
+starts/booked half-hours, and verified booking horizon. It never stores raw
+responses, URLs, request bodies, cookies, exception text, names, or booking
+descriptions. Consecutive successful observations only show that availability
+changed between checks; they cannot identify exact booking times or actors.
+**Kopieren** places retained sanitized text on clipboard. **Löschen** requires
+confirmation and clears only diagnostic history. Nothing uploads automatically.
+
 **App-Update** opens a manual update check against this repository's stable
 GitHub Releases. A newer APK downloads only after confirmation and must match
 the app's package, advertised version, and installed signing certificate.

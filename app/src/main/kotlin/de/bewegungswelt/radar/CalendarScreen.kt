@@ -27,8 +27,11 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -123,11 +126,13 @@ internal fun CalendarScreen(
     openRequest: Int = 0,
     onOpenNotifications: () -> Unit = {},
     onAppUpdate: (() -> Unit)? = null,
+    onDiagnostics: () -> Unit = {},
 ) {
     var selectedEpoch by rememberSaveable { mutableLongStateOf(today.toEpochDay()) }
     var monthEpoch by rememberSaveable { mutableLongStateOf(today.withDayOfMonth(1).toEpochDay()) }
     var monthMode by rememberSaveable { mutableStateOf(false) }
     var detailStart by rememberSaveable { mutableStateOf<String?>(null) }
+    var menuExpanded by rememberSaveable { mutableStateOf(false) }
     val selected = LocalDate.ofEpochDay(selectedEpoch)
     val month = YearMonth.from(LocalDate.ofEpochDay(monthEpoch))
     val weekStart = selected.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
@@ -171,14 +176,35 @@ internal fun CalendarScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.venue_name), Modifier.weight(1f), color = SecondaryText, style = MaterialTheme.typography.titleMedium)
-                        if (onAppUpdate != null) TextButton(onClick = onAppUpdate) {
-                            Text(stringResource(R.string.app_update))
+                        Text(
+                            stringResource(R.string.app_name),
+                            Modifier.weight(1f),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Box {
+                            IconButton(
+                                onClick = { menuExpanded = true },
+                                modifier = Modifier.semantics { contentDescription = "Weitere Optionen" },
+                            ) { Text("⋮", Modifier.clearAndSetSemantics {}, style = MaterialTheme.typography.headlineSmall) }
+                            DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Neue freie Zeiten") },
+                                    onClick = { menuExpanded = false; onOpenNotifications() },
+                                )
+                                if (onAppUpdate != null) DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.app_update)) },
+                                    onClick = { menuExpanded = false; onAppUpdate() },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Diagnose") },
+                                    onClick = { menuExpanded = false; onDiagnostics() },
+                                )
+                            }
                         }
                     }
-                    TextButton(onClick = onOpenNotifications) { Text("Neue freie Zeiten · Benachrichtigungen") }
+                    Text(stringResource(R.string.venue_name), color = SecondaryText, style = MaterialTheme.typography.titleMedium)
                 }
                 Column(
                     Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(10.dp)).padding(12.dp),
